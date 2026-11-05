@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <title>rootcard — an ID card for online logins that you own</title>
-<meta name="description" content="rootcard is a portable, self-certifying identity: a username and password that no server can steal, reset or lock you out of, backed by a recovery card you keep. Get yours free at rootcard.org.">
+<meta name="description" content="rootcard is a portable, self-certifying identity: a username and password that no server can steal, reset or lock you out of, backed by a recovery card you keep. Create one with rootcard.org as its home.">
 <meta property="og:title" content="rootcard — an ID card for online logins that you own">
 <meta property="og:description" content="Servers can check that you are you, but they can never become you, never learn your password, and never keep you from moving.">
 <meta property="og:type" content="website">
@@ -16,12 +16,12 @@
   <div class="wrap hero-grid">
     <div>
       <span class="eyebrow"><span class="badge teal"><span class="dot"></span>Open source · format v1 draft</span></span>
-      <h1>An ID card for the internet. <span class="grad">Owned by you.</span></h1>
+      <h1>An ID card for online logins <span class="grad">that you own.</span></h1>
       <p class="lead">rootcard is a login you carry. Servers can check that you are you, but they can never become you,
         never learn your password, and never keep you from moving. One recovery card, kept in a drawer, can always
         rebuild everything.</p>
       <div class="btn-row">
-        <a class="btn btn-primary btn-lg" href="/create">Get your card — free</a>
+        <a class="btn btn-primary btn-lg" href="/create">Create a card</a>
         <a class="btn btn-lg btn-ghost" href="#how">How it works</a>
       </div>
       <div class="hero-facts">
@@ -72,7 +72,7 @@
   <div class="wrap">
     <div class="section-head">
       <span class="eyebrow">How it works</span>
-      <h2>Everyday simple. Cryptographically yours.</h2>
+      <h2>A username and a password, backed by signatures.</h2>
       <p>For you it is a username, a password and a card in a drawer. Under the hood, every step is a signature anyone
         can check.</p>
     </div>
@@ -149,7 +149,7 @@
         <p class="muted">Choose a home: rootcard.org, a host run by someone you trust, or your own. Any other service
           checks who you are by itself, from a fresh proof addressed to it. Your account there is keyed by your account
           id, which never changes, even when you move.</p>
-        <a href="/create">Get a card with rootcard.org as home →</a>
+        <a href="/create">Create a card with rootcard.org as home →</a>
       </div>
     </div>
   </div>
@@ -159,7 +159,7 @@
   <div class="wrap">
     <div class="section-head">
       <span class="eyebrow">How it compares</span>
-      <h2>Honest about where it stands.</h2>
+      <h2>Where it stands.</h2>
       <p>Against database leaks, replay and lock-in, rootcard does better than password logins and social logins. It
         does not yet match passkeys against phishing, and it is young.</p>
     </div>
@@ -202,7 +202,7 @@
 <span class="k">const</span> state = <span class="k">await</span> verifyProof(proof, log, challenge,
   <span class="s">"https://shop.example"</span>, { realms: [<span class="s">"global"</span>], now });
 
-console.log(state.handle);   <span class="c">// "Astra#3F9C", forever</span></pre>
+console.log(state.handle);   <span class="c">// "Astra#3F9C"</span></pre>
   </div>
 </section>
 
@@ -239,12 +239,12 @@ console.log(state.handle);   <span class="c">// "Astra#3F9C", forever</span></pr
 <section>
   <div class="wrap">
     <div class="cta">
-      <span class="eyebrow">Free, no server needed</span>
-      <h2>Get your rootcard in a minute.</h2>
+      <span class="eyebrow">No server of your own needed</span>
+      <h2>Try it with rootcard.org as your home.</h2>
       <p>Everything happens in your browser: the keys, the vault, the card. rootcard.org becomes your home and never sees
         your password.</p>
       <div class="btn-row">
-        <a class="btn btn-primary btn-lg" href="/create">Get your card</a>
+        <a class="btn btn-primary btn-lg" href="/create">Create a card</a>
         <a class="btn btn-lg btn-ghost" href="/account">I already have one</a>
       </div>
     </div>
