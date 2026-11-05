@@ -1,0 +1,4 @@
+target
+*.db*
+host.key
+.git

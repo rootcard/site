@@ -1,0 +1,20 @@
+[package]
+name = "rootcard-site"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+description = "rootcard.org: the product site and a public rootcard home host"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[dependencies]
+rootcard = { version = "=0.2.1", default-features = false }
+rootcard-host = "=0.2.1"
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal"] }
+rusqlite = { version = "0.37", features = ["bundled"] }
+getrandom = "0.3"
+zeroize = "1"
+
+[build-dependencies]
+sha2 = "0.10"

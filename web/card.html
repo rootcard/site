@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<title>Look up a card — rootcard</title>
+<meta name="description" content="Look up a rootcard identity by its handle and verify it in your browser.">
+<!--#include head-->
+</head>
+<body data-page="card">
+<!--#include header-->
+<main id="main">
+  <div class="wrap page-head">
+    <span class="eyebrow">Look up a card</span>
+    <h1>Check anyone's card yourself.</h1>
+    <p>Type a handle. Your browser fetches the identity's public log and profile from rootcard.org and verifies every
+      signature itself: you do not have to trust this server's word.</p>
+  </div>
+  <div class="wrap app-grid">
+    <div>
+      <form class="panel" id="lookupForm" novalidate>
+        <div class="field">
+          <label for="q">Handle or account id</label>
+          <div class="input-group">
+            <input id="q" type="search" autocapitalize="off" spellcheck="false" placeholder="Astra#3F9C">
+            <button class="btn btn-primary" type="submit">Look up</button>
+          </div>
+        </div>
+        <div class="status" id="lookupStatus" aria-live="polite"></div>
+      </form>
+      <section class="panel" id="result" hidden>
+        <h2 id="rHandle"></h2>
+        <p class="muted" id="rAbout"></p>
+        <p id="rUrlRow" hidden><span class="faint">Website (written by the owner): </span><span class="mono" id="rUrl"></span></p>
+        <dl class="kv" id="rFacts"></dl>
+        <hr>
+        <h3>Checked in this browser</h3>
+        <ul class="muted" id="rChecks"></ul>
+      </section>
+    </div>
+    <aside class="sticky">
+      <div class="card-stage"><div id="card" class="idcard"></div></div>
+      <p class="center faint" id="cardNote">Look up a handle to see its card.</p>
+    </aside>
+  </div>
+</main>
+<!--#include footer-->
+<script type="module" src="/js/card.js"></script>
+</body>
+</html>

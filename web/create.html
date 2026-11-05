@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<title>Get your card — rootcard</title>
+<meta name="description" content="Create a rootcard identity with rootcard.org as its home. The keys are made in your browser; the server never sees your password.">
+<!--#include head-->
+</head>
+<body data-page="create">
+<!--#include header-->
+<main id="main">
+  <div class="wrap page-head">
+    <span class="eyebrow">Get your card</span>
+    <h1>Your identity, made in your browser.</h1>
+    <p>rootcard.org becomes your home: it stores your public log and your encrypted vault. The keys are generated on this
+      device, and the password never leaves it.</p>
+  </div>
+
+  <div class="wrap app-grid">
+    <div>
+      <ol class="wizard" id="wizard">
+        <li data-step="1" class="active"><i>1</i>Choose</li>
+        <li data-step="2"><i>2</i>Save the recovery card</li>
+        <li data-step="3"><i>3</i>Done</li>
+      </ol>
+
+      <form class="panel" id="step1" novalidate>
+        <h2>Choose a username and a password</h2>
+        <div class="field">
+          <label for="username">Username</label>
+          <input id="username" name="username" type="text" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="20" required>
+          <span class="hint">3–20 letters, digits, <code>-</code> or <code>_</code>, starting with a letter. A tag from
+            your key is added: <span id="handlePreview" class="mono">you#····</span>.</span>
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="new-password" required>
+          <div class="meter" aria-hidden="true"><i id="meter"></i></div>
+          <span class="hint">At least 12 characters. A long passphrase is best. It never leaves this device.</span>
+        </div>
+        <div class="field">
+          <label for="password2">Password again</label>
+          <input id="password2" name="password2" type="password" autocomplete="new-password" required>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary btn-lg" type="submit">Create my recovery card</button>
+        </div>
+        <div class="status" id="status1" aria-live="polite"></div>
+      </form>
+
+      <section class="panel" id="step2" hidden aria-labelledby="s2h">
+        <h2 id="s2h">Save your recovery card</h2>
+        <div class="notice warn"><p><b>This is the only copy.</b> The recovery card resets a forgotten password and
+          moves your identity. Nobody can recover your identity without it, not even rootcard.org. Anyone who has it
+          controls your identity: keep it offline and private.</p></div>
+        <p></p>
+        <pre class="recovery-text" id="cardText"></pre>
+        <p></p>
+        <div class="btn-row">
+          <button class="btn" type="button" id="saveCard">Download card file</button>
+          <button class="btn" type="button" id="printCard">Print card</button>
+        </div>
+        <p class="hint">The card file (<code>.card.json</code>) opens in the key tool. Store it offline, for example on a
+          USB stick, or print it and keep the paper in a drawer.</p>
+        <hr>
+        <label class="check"><input type="checkbox" id="saved"> I have saved my recovery card somewhere safe and
+          offline, and I understand that without it a forgotten password cannot be reset.</label>
+        <p></p>
+        <div class="btn-row">
+          <button class="btn btn-primary btn-lg" type="button" id="activate" disabled>Activate my card</button>
+          <button class="btn btn-ghost" type="button" id="restart">Start over</button>
+        </div>
+        <div class="status" id="status2" aria-live="polite"></div>
+      </section>
+
+      <section class="panel" id="step3" hidden aria-labelledby="s3h">
+        <span class="badge ok"><span class="dot"></span>Registered and verified</span>
+        <h2 id="s3h">Welcome, <span id="doneHandle"></span></h2>
+        <p class="muted">Your identity is live with rootcard.org as its home. Its log was fetched back and verified in
+          this browser. Download the account file too: with it and the recovery card you can move everything to another
+          home at any time.</p>
+        <div class="btn-row">
+          <a class="btn btn-primary" id="signin" href="/account">Sign in</a>
+          <button class="btn" type="button" id="saveAccount">Download account file</button>
+          <a class="btn btn-ghost" id="viewCard" href="/card">View public card</a>
+        </div>
+      </section>
+    </div>
+
+    <aside class="sticky">
+      <div class="card-stage"><div id="preview" class="idcard"></div></div>
+      <p class="center faint" id="previewNote">A preview. The tag and the account id come from your key.</p>
+      <div class="panel">
+        <h3>What happens here</h3>
+        <dl class="kv">
+          <dt>On this device</dt><dd>A random recovery key, your account key, and a vault locked with your password (Argon2id, 64 MiB)</dd>
+          <dt>Sent to rootcard.org</dt><dd>The signed public log, the encrypted vault and an empty public profile</dd>
+          <dt>Never sent</dt><dd>Your password and your recovery key</dd>
+          <dt>Realm</dt><dd><code>global</code></dd>
+        </dl>
+      </div>
+    </aside>
+  </div>
+
+  <div class="print-only print-card" id="printArea"></div>
+</main>
+<!--#include footer-->
+<script type="module" src="/js/create.js"></script>
+</body>
+</html>

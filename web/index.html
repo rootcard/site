@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<title>rootcard — an ID card for online logins that you own</title>
+<meta name="description" content="rootcard is a portable, self-certifying identity: a username and password that no server can steal, reset or lock you out of, backed by a recovery card you keep. Get yours free at rootcard.org.">
+<meta property="og:title" content="rootcard — an ID card for online logins that you own">
+<meta property="og:description" content="Servers can check that you are you, but they can never become you, never learn your password, and never keep you from moving.">
+<meta property="og:type" content="website">
+<!--#include head-->
+</head>
+<body data-page="home">
+<!--#include header-->
+<main id="main">
+
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow"><span class="badge teal"><span class="dot"></span>Open source · format v1 draft</span></span>
+      <h1>An ID card for the internet. <span class="grad">Owned by you.</span></h1>
+      <p class="lead">rootcard is a login you carry. Servers can check that you are you, but they can never become you,
+        never learn your password, and never keep you from moving. One recovery card, kept in a drawer, can always
+        rebuild everything.</p>
+      <div class="btn-row">
+        <a class="btn btn-primary btn-lg" href="/create">Get your card — free</a>
+        <a class="btn btn-lg btn-ghost" href="#how">How it works</a>
+      </div>
+      <div class="hero-facts">
+        <span>No password on any server</span>
+        <span>No e-mail reset to hijack</span>
+        <span>Move to any home</span>
+      </div>
+    </div>
+    <div class="hero-visual" aria-label="Example rootcard ID card and recovery card">
+      <div class="glow"></div>
+      <div id="heroBack" class="idcard back-card"></div>
+      <div id="heroFront" class="idcard front"></div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="grid-3">
+      <div class="feature">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
+        <h3>Your password stays on your device</h3>
+        <p>It unlocks an encrypted vault in your browser, which then signs a one-time challenge. The server stores no
+          password hash and has nothing it could replay.</p>
+      </div>
+      <div class="feature">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg></div>
+        <h3>Servers verify, they never vouch</h3>
+        <p>Your account id is the hash of a statement signed by your own key. Anyone can check it themselves against
+          your public log. Nobody can forge it.</p>
+      </div>
+      <div class="feature">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M7 15h4M7 11h10"/></svg></div>
+        <h3>A recovery card you keep</h3>
+        <p>Shown once when you create your identity. It resets a forgotten password and moves you to another home.
+          No backdoor, no help desk, no takeover by e-mail.</p>
+      </div>
+    </div>
+    <div class="stat-row" id="stats" hidden>
+      <div class="stat"><b id="statCards">0</b><span>cards with rootcard.org as home</span></div>
+      <div class="stat"><b>0</b><span>passwords stored here</span></div>
+      <div class="stat"><b>Ed25519 · Argon2id</b><span>standard, audited cryptography</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">How it works</span>
+      <h2>Everyday simple. Cryptographically yours.</h2>
+      <p>For you it is a username, a password and a card in a drawer. Under the hood, every step is a signature anyone
+        can check.</p>
+    </div>
+    <div class="steps">
+      <div class="step"><h3>Create</h3><p>Pick a username and a password. Your browser makes a recovery key and prints
+        it as a recovery card. Your id is the SHA-256 of a statement signed by that key, shown to people as
+        <code>Astra#3F9C</code>.</p></div>
+      <div class="step"><h3>Choose a home</h3><p>The recovery key signs an instance: a fresh account key and the server
+        that is your home. Here that is rootcard.org, so you need no server of your own.</p></div>
+      <div class="step"><h3>Sign in</h3><p>Your device proves the password to fetch the vault, unlocks it locally and
+        signs the home's one-time challenge. The password never leaves your device.</p></div>
+      <div class="step"><h3>Prove</h3><p>Any service, on any server, can ask you to sign a challenge and check it against
+        your public log. It does not call a central API and does not trust your home's word.</p></div>
+      <div class="step"><h3>Download and move</h3><p>Download your whole account as one file at any time. With the
+        recovery card, move it to another home in minutes; your id, handle and password come along.</p></div>
+      <div class="step"><h3>Recover</h3><p>Forgot the password or lost a device? The recovery card signs a new instance.
+        Every old password, vault and session stops working at once. Your id stays.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Two power levels</span>
+      <h2>The password is for every day. The card is for everything else.</h2>
+      <p>The format itself enforces the split: only the recovery key can sign changes to who can access the identity,
+        where it lives or whether it exists.</p>
+    </div>
+    <div class="power">
+      <div class="power-card low">
+        <span class="who">password · in your head · any app</span>
+        <h3>Low power</h3>
+        <ul>
+          <li>Sign in to your home</li>
+          <li>Edit your public profile and private data</li>
+          <li>Change the password (with the old one)</li>
+          <li>Download your account file</li>
+          <li>Prove who you are to a service</li>
+        </ul>
+      </div>
+      <div class="power-card high">
+        <span class="who">recovery card · offline · key tool only</span>
+        <h3>High power</h3>
+        <ul>
+          <li>Reset a forgotten password</li>
+          <li>Add or revoke passwords</li>
+          <li>Move to another home, or restore after a loss</li>
+          <li>Rotate the recovery key itself</li>
+          <li>Retire the identity for good</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Two ways to use it</span>
+      <h2>A safer login for your service. One identity for many.</h2>
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <h3>A standard username-and-password login</h3>
+        <p class="muted">Add rootcard to your own server and your users see what they already know: a username, a
+          password and, once, a recovery card to save. Your server becomes the <em>host</em> with
+          <code>rootcard-host</code> (Rust); your pages use the npm package. No redirect, no third party, no password
+          database to leak.</p>
+        <a href="/developers">Integrate rootcard →</a>
+      </div>
+      <div class="panel">
+        <h3>An ID card across websites</h3>
+        <p class="muted">Choose a home: rootcard.org, a host run by someone you trust, or your own. Any other service
+          checks who you are by itself, from a fresh proof addressed to it. Your account there is keyed by your account
+          id, which never changes, even when you move.</p>
+        <a href="/create">Get a card with rootcard.org as home →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="compare" class="band">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">How it compares</span>
+      <h2>Honest about where it stands.</h2>
+      <p>Against database leaks, replay and lock-in, rootcard does better than password logins and social logins. It
+        does not yet match passkeys against phishing, and it is young.</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th></th><th>Password + hash</th><th>Passkeys</th><th>"Sign in with …"</th><th class="us">rootcard</th></tr>
+        </thead>
+        <tbody>
+          <tr><th>Server learns the password</th><td>At every login</td><td>No password</td><td>The provider does</td><td class="us">Never sent</td></tr>
+          <tr><th>Server database stolen</th><td>Offline guessing of hashes</td><td>Nothing useful</td><td>Provider's database</td><td class="us">Offline guessing of the vault (Argon2id, 64 MiB), home only</td></tr>
+          <tr><th>Replay of a login</th><td>Session theft</td><td>No</td><td>Token theft</td><td class="us">No: one-time, bound signatures</td></tr>
+          <tr><th>Forgotten password</th><td>E-mail reset</td><td>Platform recovery</td><td>The provider decides</td><td class="us">Recovery card only; no backdoor</td></tr>
+          <tr><th>Who controls the identity</th><td>The service</td><td>The site and your sync provider</td><td>The provider</td><td class="us"><b>You</b>, through the recovery key</td></tr>
+          <tr><th>Move to another provider</th><td>New account</td><td>New credential per site</td><td>New account</td><td class="us">Same id, one key tool operation</td></tr>
+          <tr><th>Phishing</th><td>Vulnerable</td><td><b>Resistant</b></td><td>Vulnerable at the provider</td><td class="us">Relayed logins fail; a fake page can still capture the password</td></tr>
+          <tr><th>Maturity</th><td>Decades</td><td>Widely deployed</td><td>Widely deployed</td><td class="us">New, not yet externally reviewed</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap grid-2 align-center">
+    <div>
+      <span class="eyebrow">For developers</span>
+      <h2>Two libraries and one HTTP binding.</h2>
+      <p class="muted">Rust and JavaScript implement the same functions and produce the same bytes, checked against shared
+        test vectors. The JavaScript package has zero dependencies and runs on WebCrypto in browsers and Node 20+. A host
+        never sees a password, never runs Argon2id and verifies logs incrementally.</p>
+      <div class="btn-row">
+        <a class="btn" href="/developers">Developer guide</a>
+        <a class="btn btn-ghost" href="https://github.com/Hexagon/rootcard/blob/main/spec/SPEC.md">Read the spec</a>
+      </div>
+    </div>
+    <pre><span class="c">// Verify a proof from anyone, against their public log</span>
+<span class="k">import</span> { verifyProof } <span class="k">from</span> <span class="s">"rootcard"</span>;
+
+<span class="k">const</span> state = <span class="k">await</span> verifyProof(proof, log, challenge,
+  <span class="s">"https://shop.example"</span>, { realms: [<span class="s">"global"</span>], now });
+
+console.log(state.handle);   <span class="c">// "Astra#3F9C", forever</span></pre>
+  </div>
+</section>
+
+<section id="faq" class="band">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Questions</span>
+      <h2>Good to know</h2>
+    </div>
+    <div class="faq">
+      <details><summary>Does rootcard.org keep a copy of my account?</summary>
+        <p>Yes. As your home it keeps the public log, the public profile and the encrypted vault. It cannot decrypt the
+          vault and cannot reset your password. You can download the whole account as one file at any time.</p></details>
+      <details><summary>What happens if I lose the recovery card?</summary>
+        <p>The identity keeps working with your password, but it can no longer be reset or moved. If you then also forget
+          the password, the identity is gone. Nobody, rootcard.org included, can recover it: that is the point.</p></details>
+      <details><summary>What if rootcard.org disappears?</summary>
+        <p>With the recovery card your id and handle survive on any other host. With the card and a downloaded account
+          file, everything moves: private data, profile and passwords.</p></details>
+      <details><summary>Why is the key tool a file I download?</summary>
+        <p>The recovery key is never typed into a page a server delivers live, because that server could change the page.
+          The key tool is a single HTML file from the npm package that you open from your own disk. It talks only to the
+          hosts you enter.</p></details>
+      <details><summary>Can services link my accounts?</summary>
+        <p>Every service gets its own proof, valid only for that service. If you do not want services to link your
+          accounts, create several identities: they cannot be linked by their public data.</p></details>
+      <details><summary>Is it ready?</summary>
+        <p>rootcard is published and usable, but pre-1.0: the format is a draft and has not had an external security
+          review. Use it to try things and for low-value accounts, not yet for anything you cannot afford to lose.</p></details>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="cta">
+      <span class="eyebrow">Free, no server needed</span>
+      <h2>Get your rootcard in a minute.</h2>
+      <p>Everything happens in your browser: the keys, the vault, the card. rootcard.org becomes your home and never sees
+        your password.</p>
+      <div class="btn-row">
+        <a class="btn btn-primary btn-lg" href="/create">Get your card</a>
+        <a class="btn btn-lg btn-ghost" href="/account">I already have one</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+<!--#include footer-->
+<script type="module" src="/js/home.js"></script>
+</body>
+</html>

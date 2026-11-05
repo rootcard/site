@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<title>Developers — rootcard</title>
+<meta name="description" content="Integrate rootcard: verify users with proofs, run your own host with rootcard-host, or build clients with the zero-dependency npm package. rootcard.org is a public home with an open API.">
+<!--#include head-->
+</head>
+<body data-page="developers">
+<!--#include header-->
+<main id="main">
+  <div class="wrap page-head">
+    <span class="eyebrow">Developers</span>
+    <h1>Two libraries and one HTTP binding.</h1>
+    <p>The core is pure: no I/O, no clock, no randomness of its own. Rust (<code>rootcard</code>,
+      <code>rootcard-host</code>) and JavaScript (<code>rootcard</code> on npm) produce the same bytes, checked against
+      the shared vectors of the specification.</p>
+  </div>
+
+  <div class="wrap">
+    <div class="grid-3">
+      <a class="feature" href="#verify"><h3>Verify users</h3><p>Any server can check "is this really Astra#3F9C, now?"
+        with a fresh challenge and <code>verifyProof</code>. No central API.</p></a>
+      <a class="feature" href="#host"><h3>Run your own host</h3><p>Give your service a standard username-and-password
+        login with <code>rootcard-host</code>. No password hashes in your database.</p></a>
+      <a class="feature" href="#api"><h3>Use rootcard.org</h3><p>A public home for the <code>global</code> realm, with
+        the recommended HTTP binding and open CORS.</p></a>
+    </div>
+  </div>
+
+  <section id="verify">
+    <div class="wrap grid-2">
+      <div>
+        <span class="eyebrow">Relying party</span>
+        <h2>Verify a proof</h2>
+        <p class="muted">Give the user a fresh 32-byte challenge and your own <code>recipient</code> string. The user signs
+          it with their account key (in their home's client) and sends you the proof and their log. Fetch the newest log
+          from their home if you want to be sure it is current, then verify. Store at most the newest log per identity
+          you deal with, and key your accounts by the account id: it never changes.</p>
+        <p class="muted">Signed-in users of rootcard.org can make proofs on their account page.</p>
+      </div>
+      <pre><span class="k">import</span> { verifyProof, compareLogs } <span class="k">from</span> <span class="s">"rootcard"</span>;
+
+<span class="c">// 1. challenge = crypto.getRandomValues(new Uint8Array(32))</span>
+<span class="c">// 2. the user returns { proof, log }</span>
+<span class="c">// 3. optionally fetch the newest log from the home:</span>
+<span class="c">//    GET https://rootcard.org/v0/id/{account}/log</span>
+
+<span class="k">const</span> state = <span class="k">await</span> verifyProof(proof, log, challenge,
+  <span class="s">"https://shop.example"</span>,
+  { realms: [<span class="s">"global"</span>], now: Math.floor(Date.now() / 1000) });
+
+state.account   <span class="c">// the stable key for your user table</span>
+state.handle    <span class="c">// "Astra#3F9C", for display</span></pre>
+    </div>
+  </section>
+
+  <section id="host" class="band">
+    <div class="wrap grid-2">
+      <div>
+        <span class="eyebrow">Host</span>
+        <h2>Run your own home</h2>
+        <p class="muted"><code>rootcard-host</code> is a library, not a server: it owns the rules and leaves HTTP,
+          storage and secrets to you. Implement three storage traits (identities with compare-and-swap, single-use
+          challenges, sessions), pass your clock and random bytes, and wire <code>http::route</code> into any HTTP
+          server.</p>
+        <p class="muted">This site is exactly that: an axum server with SQLite storage. Its source is a good starting
+          point.</p>
+        <ul class="muted">
+          <li>Hosts never see a password and never run Argon2id.</li>
+          <li>Build the core without its <code>vault</code> feature.</li>
+          <li>Serve your client pages with a strict CSP; they handle passwords.</li>
+        </ul>
+      </div>
+      <pre><span class="c"># Cargo.toml</span>
+rootcard-host = <span class="s">"{{rootcard_version}}"</span>
+rootcard = { version = <span class="s">"{{rootcard_version}}"</span>, default-features = <span class="k">false</span> }
+
+<span class="c">// main.rs</span>
+<span class="k">use</span> rootcard_host::{Host, HostConfig, RealmConfig, UsernamePolicy};
+<span class="k">use</span> rootcard_host::http::{route, Request};
+
+<span class="k">let</span> host = Host::new(HostConfig {
+    key_seed,                                  <span class="c">// your host key</span>
+    retired_keys: vec![],
+    urls: vec![<span class="s">"https://id.example.com"</span>.into()],
+    realms: vec![RealmConfig { realm: <span class="s">"myapp"</span>.into(),
+                               policy: UsernamePolicy::DEFAULT }],
+    peers: vec![],
+}, identities, challenges, sessions);
+
+<span class="c">// for every request under /v0:</span>
+<span class="k">let</span> res = route(&amp;host, &amp;Request { method, path, bearer, peer, body },
+                now, &amp;<span class="k">mut</span> |b| getrandom::fill(b).unwrap());</pre>
+    </div>
+  </section>
+
+  <section id="client">
+    <div class="wrap grid-2">
+      <div>
+        <span class="eyebrow">Client</span>
+        <h2>Register and sign in from the browser</h2>
+        <p class="muted">The npm package has zero dependencies and no build step. <code>rootcard</code> is the
+          verification core; <code>rootcard/vault</code> adds passwords, Argon2id and vault encryption. The flows are in
+          the host protocol, §7. This site's pages are a complete client: registration, sign-in, profile and private
+          data, password change and proofs.</p>
+        <div class="notice"><p>Generate the recovery key in the client, make the user save the card <em>before</em>
+          you send the registration, then erase it. Never ask for the recovery key in an application client.</p></div>
+      </div>
+      <pre><span class="k">import</span> { register } <span class="k">from</span> <span class="s">"rootcard/vault"</span>;
+<span class="k">import</span> { systemRandom, KDF_DEFAULT } <span class="k">from</span> <span class="s">"rootcard"</span>;
+
+<span class="k">const</span> base = <span class="s">"https://rootcard.org"</span>;
+<span class="k">const</span> d = <span class="k">await</span> (<span class="k">await</span> fetch(`${base}/v0/host`)).json();
+<span class="k">const</span> rk = systemRandom(32);
+<span class="k">const</span> reg = <span class="k">await</span> register(rk, <span class="s">"global"</span>, <span class="s">"Astra"</span>, password,
+  <span class="s">"Password"</span>, { key: d.key, url: base },
+  Math.floor(Date.now() / 1000), KDF_DEFAULT, systemRandom);
+rk.fill(0);
+
+<span class="c">// show and save reg.card first, then:</span>
+<span class="k">await</span> fetch(`${base}/v0/id/register`, { method: <span class="s">"POST"</span>,
+  headers: { <span class="s">"Content-Type"</span>: <span class="s">"application/json"</span> },
+  body: JSON.stringify({ log: reg.log, vault: reg.vault,
+                         public: reg.public }) });</pre>
+    </div>
+  </section>
+
+  <section id="api" class="band">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">rootcard.org as a home</span>
+        <h2>The public API</h2>
+        <p>rootcard.org serves the recommended HTTP binding for the <code>global</code> realm. Every endpoint below is
+          under <code>https://rootcard.org/v0</code>. The base URL that goes into logs and signed messages is
+          <code>https://rootcard.org</code>, without the version.</p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Endpoint</th><th>What</th><th>Limit per address</th></tr></thead>
+          <tbody>
+            <tr><td><code>GET /host</code></td><td>Host key, addresses and realms</td><td>120 / min</td></tr>
+            <tr><td><code>GET /id/lookup?realm=global&amp;handle=…</code></td><td>Resolve a handle to an account id and its home</td><td>120 / min</td></tr>
+            <tr><td><code>GET /id/{account}/log</code></td><td>The newest log</td><td>120 / min</td></tr>
+            <tr><td><code>GET /id/{account}/public</code></td><td>The signed public profile</td><td>120 / min</td></tr>
+            <tr><td><code>POST /id/register</code></td><td>Register an identity with this home</td><td>3 / hour</td></tr>
+            <tr><td><code>POST /id/{account}/events</code></td><td>Newer events (rotation, retirement)</td><td>30 / hour</td></tr>
+            <tr><td><code>POST /id/{account}/instance</code></td><td>Move here or reset (key tool)</td><td>30 / hour</td></tr>
+            <tr><td><code>GET /id/{account}/locks</code></td><td>Lock hints for sign-in</td><td>30 / hour</td></tr>
+            <tr><td><code>POST /id/{account}/challenge</code></td><td>A single-use challenge (60 s)</td><td>10 / min</td></tr>
+            <tr><td><code>POST /id/{account}/fetch</code></td><td>The vault, after a lock proof</td><td>30 / hour, 10 / hour per identity</td></tr>
+            <tr><td><code>POST /id/{account}/login</code></td><td>Sign in; returns a bearer token</td><td>10 / min</td></tr>
+            <tr><td><code>/session/*</code></td><td>Vault, profile, password change, export, logout</td><td>120 / min</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p></p>
+      <p class="muted">Errors are JSON objects with the specification's codes (<code>{ "error": "not_home", … }</code>).
+        CORS is open and no endpoint uses cookies. Full details: <a href="https://github.com/Hexagon/rootcard/blob/main/docs/HOST_PROTOCOL.md">HOST_PROTOCOL.md</a>.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">Packages</span>
+        <h2>Everything is open source</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Registry</th><th>Package</th><th>What</th></tr></thead>
+          <tbody>
+            <tr><td>crates.io</td><td><a href="https://crates.io/crates/rootcard"><code>rootcard</code></a></td><td>Core library: formats, verification, vault, proofs. Pure, no I/O</td></tr>
+            <tr><td>crates.io</td><td><a href="https://crates.io/crates/rootcard-host"><code>rootcard-host</code></a></td><td>Helpers for hosts: challenges, stores, HTTP-agnostic handlers</td></tr>
+            <tr><td>crates.io</td><td><a href="https://crates.io/crates/rootcard-cli"><code>rootcard-cli</code></a></td><td>The key tool as a command (<code>rootcard</code>)</td></tr>
+            <tr><td>npm</td><td><a href="https://www.npmjs.com/package/rootcard"><code>rootcard</code></a></td><td>The same core in plain ES modules, zero dependencies, and <code>keytool.html</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p></p>
+      <div class="btn-row">
+        <a class="btn" href="https://github.com/Hexagon/rootcard/blob/main/spec/SPEC.md">Specification</a>
+        <a class="btn" href="https://github.com/Hexagon/rootcard/blob/main/docs/CONCEPTS.md">Concepts</a>
+        <a class="btn" href="https://github.com/Hexagon/rootcard/blob/main/docs/THREAT_MODEL.md">Threat model</a>
+        <a class="btn" href="https://github.com/Hexagon/rootcard/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+      </div>
+    </div>
+  </section>
+</main>
+<!--#include footer-->
+</body>
+</html>

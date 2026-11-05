@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<title>Sign in — rootcard</title>
+<meta name="description" content="Sign in to your rootcard identity at rootcard.org. Your password unlocks your vault in this browser and is never sent.">
+<!--#include head-->
+</head>
+<body data-page="account">
+<!--#include header-->
+<main id="main">
+
+  <div id="signedOut">
+    <div class="wrap page-head">
+      <span class="eyebrow">Sign in</span>
+      <h1>Welcome back.</h1>
+      <p>Your password unlocks your vault here in the browser, which then signs rootcard.org's one-time challenge. The
+        password itself is never sent.</p>
+    </div>
+    <div class="wrap app-grid">
+      <form class="panel" id="signinForm" novalidate>
+        <h2>Sign in with your handle</h2>
+        <div class="field">
+          <label for="handle">Handle</label>
+          <input id="handle" type="text" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="Astra#3F9C" required>
+          <span class="hint">Your username, a <code>#</code> and the 4-character tag from your card.</span>
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" type="password" autocomplete="current-password" required>
+        </div>
+        <div class="field" id="lockField" hidden>
+          <label for="lock">Which password</label>
+          <select id="lock"></select>
+          <span class="hint">This identity has several passwords. Pick the one you typed.</span>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary btn-lg" type="submit">Sign in</button>
+          <a class="btn btn-ghost" href="/create">Get a card instead</a>
+        </div>
+        <div class="status" id="signinStatus" aria-live="polite"></div>
+      </form>
+      <aside class="panel">
+        <h3>Forgot your password?</h3>
+        <p class="muted">Nobody can reset it for you, rootcard.org included: there is no e-mail reset to hijack. Reset it
+          yourself with your recovery card in the <a href="/keytool">key tool</a>. Your id, your handle and your data
+          stay.</p>
+        <h3>Home somewhere else?</h3>
+        <p class="muted">You sign in only at your identity's home. If your home is another server, sign in there; if you
+          want rootcard.org as your home, move with the key tool.</p>
+      </aside>
+    </div>
+  </div>
+
+  <div id="signedIn" hidden>
+    <div class="wrap page-head">
+      <span class="eyebrow">Your identity</span>
+      <h1 id="hello">Your card</h1>
+      <p>Unlocked in this browser only. Closing the tab signs you out.</p>
+    </div>
+    <div class="wrap app-grid">
+      <div>
+        <div class="tabs" role="tablist">
+          <button role="tab" aria-selected="true" data-tab="overview">Overview</button>
+          <button role="tab" aria-selected="false" data-tab="profile">Profile &amp; data</button>
+          <button role="tab" aria-selected="false" data-tab="password">Password</button>
+          <button role="tab" aria-selected="false" data-tab="prove">Prove</button>
+          <button role="tab" aria-selected="false" data-tab="recovery">Recovery</button>
+        </div>
+
+        <section class="panel" data-panel="overview">
+          <h2>Overview</h2>
+          <dl class="kv" id="facts"></dl>
+          <hr>
+          <div class="btn-row">
+            <button class="btn btn-primary" type="button" id="export">Download account file</button>
+            <a class="btn" id="publicLink" href="/card">View public card</a>
+            <button class="btn btn-danger" type="button" id="signout">Sign out</button>
+          </div>
+          <div class="status" id="overviewStatus" aria-live="polite"></div>
+        </section>
+
+        <form class="panel" data-panel="profile" hidden id="profileForm" novalidate>
+          <h2>Public profile</h2>
+          <div class="notice warn"><p>Your public profile is shared with every host and service that looks you up.
+            Once copied it cannot be taken back.</p></div>
+          <p></p>
+          <div class="field">
+            <label for="pName">Display name <span class="hint">user.name</span></label>
+            <input id="pName" type="text" maxlength="64">
+          </div>
+          <div class="field">
+            <label for="pAbout">About <span class="hint">user.about</span></label>
+            <input id="pAbout" type="text" maxlength="280">
+          </div>
+          <div class="field">
+            <label for="pUrl">Website <span class="hint">user.url</span></label>
+            <input id="pUrl" type="url" maxlength="200" placeholder="https://">
+          </div>
+          <h2>Private data</h2>
+          <p class="muted">Encrypted inside your vault. rootcard.org stores it but cannot read it.</p>
+          <div class="field">
+            <label for="pNote">Private note <span class="hint">user.note</span></label>
+            <textarea id="pNote" maxlength="4000"></textarea>
+          </div>
+          <div class="btn-row"><button class="btn btn-primary" type="submit">Save</button></div>
+          <div class="status" id="profileStatus" aria-live="polite"></div>
+        </form>
+
+        <form class="panel" data-panel="password" hidden id="passwordForm" novalidate>
+          <h2>Change password</h2>
+          <p class="muted">The new password replaces the one you signed in with. The change is signed with the old
+            password, so rootcard.org can check it without ever seeing either.</p>
+          <div class="field">
+            <label for="newPassword">New password</label>
+            <input id="newPassword" type="password" autocomplete="new-password">
+            <span class="hint">At least 12 characters, not your username.</span>
+          </div>
+          <div class="field">
+            <label for="newPassword2">New password again</label>
+            <input id="newPassword2" type="password" autocomplete="new-password">
+          </div>
+          <div class="notice"><p>A password change stops the old password at once. After a suspected leak, reset with
+            the recovery card in the key tool instead: that also ends every copy of the old vault.</p></div>
+          <p></p>
+          <div class="btn-row"><button class="btn btn-primary" type="submit">Change password</button></div>
+          <div class="status" id="passwordStatus" aria-live="polite"></div>
+        </form>
+
+        <form class="panel" data-panel="prove" hidden id="proveForm" novalidate>
+          <h2>Prove who you are</h2>
+          <p class="muted">A service that wants to know "is this really you, now?" gives you a challenge and names
+            itself as the recipient. The proof is valid only for that recipient and only while this instance is
+            current.</p>
+          <div class="field">
+            <label for="recipient">Recipient</label>
+            <input id="recipient" type="text" placeholder="https://shop.example">
+          </div>
+          <div class="field">
+            <label for="challenge">Challenge</label>
+            <textarea id="challenge" placeholder="64 hex characters, or a JSON statement"></textarea>
+            <span class="hint">A JSON statement is hashed into the challenge; say what it is for and until when.</span>
+          </div>
+          <div class="btn-row"><button class="btn btn-primary" type="submit">Sign proof</button>
+            <button class="btn" type="button" id="copyProof" hidden>Copy</button></div>
+          <div class="status" id="proveStatus" aria-live="polite"></div>
+          <pre id="proofOut" hidden></pre>
+        </form>
+
+        <section class="panel" data-panel="recovery" hidden>
+          <h2>Recovery and moving</h2>
+          <p class="muted">These change who can access your identity or where it lives, so they need the recovery card.
+            The recovery card is never typed into this site: use the key tool, a page you open from your own disk.</p>
+          <ul class="muted">
+            <li>Reset a forgotten password</li>
+            <li>Add or revoke passwords</li>
+            <li>Move to another home, or restore after losing this one</li>
+            <li>Rotate the recovery key, or retire the identity</li>
+          </ul>
+          <a class="btn btn-primary" href="/keytool">Get the key tool</a>
+        </section>
+      </div>
+
+      <aside class="sticky">
+        <div class="card-stage"><div id="card" class="idcard"></div></div>
+      </aside>
+    </div>
+  </div>
+
+</main>
+<!--#include footer-->
+<script type="module" src="/js/account.js"></script>
+</body>
+</html>

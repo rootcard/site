@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<title>Key tool — rootcard</title>
+<meta name="description" content="The rootcard key tool: reset a forgotten password, move to another home, rotate or retire, with your recovery card. A single HTML file you open from your own disk.">
+<!--#include head-->
+</head>
+<body data-page="keytool">
+<!--#include header-->
+<main id="main">
+  <div class="wrap page-head">
+    <span class="eyebrow">Key tool</span>
+    <h1>The one place your recovery card goes.</h1>
+    <p>Everything that changes who can access your identity, where it lives or whether it exists needs the recovery key.
+      The key tool is the only program that asks for it: a single HTML file that you save and open from your own disk.</p>
+  </div>
+  <div class="wrap app-grid">
+    <div>
+      <section class="panel">
+        <h2>Download</h2>
+        <p class="muted">The page is the <code>keytool.html</code> of the npm package <code>rootcard@{{rootcard_version}}</code>,
+          unchanged. Save it, then open the saved file in your browser. It works offline, from <code>file://</code>,
+          and talks only to the hosts you enter.</p>
+        <div class="btn-row">
+          <a class="btn btn-primary btn-lg" href="/download/rootcard-keytool.html" download="rootcard-keytool.html">Download keytool.html</a>
+          <a class="btn btn-ghost" href="https://www.npmjs.com/package/rootcard/v/{{rootcard_version}}?activeTab=code">Compare on npm</a>
+        </div>
+        <p></p>
+        <dl class="kv">
+          <dt>Version</dt><dd>{{rootcard_version}}</dd>
+          <dt>SHA-256</dt><dd class="mono">{{keytool_sha256}}</dd>
+        </dl>
+        <p class="hint">Check the hash before you type a recovery key: <code>sha256sum rootcard-keytool.html</code>
+          (Linux), <code>shasum -a 256</code> (macOS) or <code>Get-FileHash</code> (Windows). Or take the file straight
+          from the npm package: <code>npm pack rootcard@{{rootcard_version}}</code>.</p>
+      </section>
+      <section class="panel">
+        <h2>What it does</h2>
+        <div class="grid-2">
+          <div><h3>Reset a forgotten password</h3><p class="muted">Mints a new instance at your home with a new password.
+            Every old password, vault copy and session stops working.</p></div>
+          <div><h3>Move or restore</h3><p class="muted">Moves your identity to another home, carrying data, profile and
+            passwords, or restores it after a home disappears.</p></div>
+          <div><h3>Add or revoke passwords</h3><p class="muted">Up to 15 passwords, each a separate lock on your
+            vault. Revoke one, for example after losing a device.</p></div>
+          <div><h3>Rotate or retire</h3><p class="muted">Replace the recovery key itself, which gives you a new card, or
+            close the identity for good.</p></div>
+        </div>
+      </section>
+    </div>
+    <aside class="sticky">
+      <div class="panel">
+        <h3>Using it with rootcard.org</h3>
+        <ol class="muted">
+          <li>Open the saved <code>rootcard-keytool.html</code>.</li>
+          <li>Load your card file (<code>.card.json</code>), or type the recovery key, realm <code>global</code> and
+            your username.</li>
+          <li>Enter <code>https://rootcard.org</code> as the host.</li>
+          <li>Choose the operation. To move here from another home, enter <code>https://rootcard.org</code> as the
+            target host.</li>
+        </ol>
+        <div class="notice warn"><p>Never type your recovery key into a website, this one included. A page a server
+          sends you can be changed by that server; a file on your disk cannot.</p></div>
+      </div>
+      <div class="panel">
+        <h3>Prefer a terminal?</h3>
+        <pre>cargo install rootcard-cli
+rootcard --help</pre>
+      </div>
+    </aside>
+  </div>
+</main>
+<!--#include footer-->
+</body>
+</html>

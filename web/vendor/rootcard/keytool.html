@@ -1,0 +1,3191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https: http://127.0.0.1:* http://localhost:*; img-src data:; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>rootcard key tool</title>
+<style>
+  :root { --bg: #fbfaf7; --fg: #1d1d1b; --muted: #6b6a66; --line: #dcd9d2; --accent: #2d5b8a; --warn: #8a3b2d; --panel: #fff; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #161615; --fg: #ecebe7; --muted: #a3a19b; --line: #3a3936; --accent: #8db6e0; --warn: #e09a8d; --panel: #1f1f1d; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; }
+  main { max-width: 880px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 0 0 12px; }
+  p.lead { color: var(--muted); margin: 0 0 20px; }
+  .warn { border-left: 3px solid var(--warn); padding: 8px 12px; margin: 0 0 20px; background: var(--panel); }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin: 0 0 16px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 8px 0 2px; }
+  input, textarea, select { width: 100%; font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+  textarea { min-height: 64px; font-family: ui-monospace, monospace; font-size: 13px; }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0 12px; }
+  button { font: inherit; padding: 6px 14px; margin: 12px 8px 0 0; border: 1px solid var(--accent); border-radius: 6px; background: transparent; color: var(--accent); cursor: pointer; }
+  button.danger { border-color: var(--warn); color: var(--warn); }
+  button:disabled { opacity: .4; cursor: default; }
+  pre { white-space: pre-wrap; word-break: break-all; font: 13px/1.45 ui-monospace, monospace; margin: 0; }
+  #status { min-height: 1.5em; }
+  .ok { color: var(--accent); } .err { color: var(--warn); }
+  details > summary { cursor: pointer; font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <h1>rootcard key tool</h1>
+  <p class="lead">The tool for everything that needs your recovery card: moving an identity, resetting or adding a password, rotating the recovery key and closing the identity. It runs entirely in this page and talks only to the hosts you enter.</p>
+  <div class="warn">Only enter your recovery key in the rootcard key tool, never in an application. Save this page and open it from your own disk.</div>
+
+  <section>
+    <h2>Your identity</h2>
+    <label for="cardFile">Recovery card (file)</label>
+    <input id="cardFile" type="file" accept=".json,application/json">
+    <details><summary>or type the card</summary>
+      <div class="row">
+        <div><label for="realm">Realm</label><input id="realm" value="global" autocomplete="off"></div>
+        <div><label for="username">Username</label><input id="username" autocomplete="off"></div>
+      </div>
+      <label for="rkey">Recovery key (RCR-…)</label><input id="rkey" autocomplete="off" spellcheck="false">
+    </details>
+    <label for="accountFile">Account file (optional)</label>
+    <input id="accountFile" type="file" accept=".json,application/json">
+    <label for="hosts">Hosts to ask for the newest version (comma separated base URLs, optional)</label>
+    <input id="hosts" placeholder="https://id.example.com" autocomplete="off">
+    <button id="load">Load identity</button>
+    <pre id="identity"></pre>
+  </section>
+
+  <section id="actions" hidden>
+    <h2>Actions</h2>
+    <div class="row">
+      <div><label for="newPassword">New password (for restore with a new host, fresh, reset, add)</label><input id="newPassword" type="password" autocomplete="new-password"></div>
+      <div><label for="label">Label of the new password</label><input id="label" value="Password"></div>
+    </div>
+    <label for="targetHost">Host for a new instance (restore, fresh)</label>
+    <input id="targetHost" placeholder="https://id.example.com" autocomplete="off">
+    <button data-op="restore">Restore at host</button>
+    <button data-op="fresh">Fresh instance at host</button>
+    <button data-op="reset">Reset forgotten password</button>
+    <button data-op="add">Add password</button>
+    <label for="slot">Password to revoke</label><select id="slot"></select>
+    <button data-op="revoke" class="danger">Revoke password</button>
+    <button data-op="rotate">Rotate recovery key</button>
+    <button data-op="card">Print card</button>
+    <label for="retireConfirm">To close the identity forever, type its username</label>
+    <input id="retireConfirm" autocomplete="off">
+    <button data-op="retire" class="danger">Retire identity</button>
+    <details><summary>Root proof</summary>
+      <label for="proofStatement">Statement (JSON) or challenge (64 hex)</label><input id="proofStatement" value='"I own this identity"'>
+      <label for="proofRecipient">Recipient</label><input id="proofRecipient">
+      <button data-op="prove">Make root proof</button>
+    </details>
+  </section>
+
+  <section>
+    <details><summary>Create a new identity</summary>
+      <div class="row">
+        <div><label for="nRealm">Realm</label><input id="nRealm" value="global"></div>
+        <div><label for="nUser">Username</label><input id="nUser"></div>
+      </div>
+      <label for="nHost">Host (optional: without one, the identity has no instance until you restore or start fresh)</label>
+      <input id="nHost" placeholder="https://id.example.com">
+      <label for="nPassword">Password</label><input id="nPassword" type="password" autocomplete="new-password">
+      <button id="create">Create</button>
+    </details>
+  </section>
+
+  <section>
+    <details><summary>Verify a proof</summary>
+      <label for="vLog">Account file or log (JSON)</label><textarea id="vLog"></textarea>
+      <label for="vProof">Proof (JSON)</label><textarea id="vProof"></textarea>
+      <label for="vStatement">Statement (JSON) or challenge (64 hex)</label><input id="vStatement">
+      <label for="vRecipient">Recipient</label><input id="vRecipient">
+      <button id="verify">Verify</button>
+    </details>
+  </section>
+
+  <section><h2>Result</h2><div id="status"></div><pre id="out"></pre></section>
+  <p class="lead">rootcard <span id="version"></span>. The format is specified in spec/SPEC.md of the rootcard repository.</p>
+</main>
+<script>
+"use strict";
+(() => {
+const ROOTCARD_VERSION = "0.2.1";
+const __modules = {};
+__modules["errors.js"] = (() => {
+// Error codes (SPEC §20).
+
+/** Every error code of SPEC §20, in its order. */
+const ERROR_CODES = Object.freeze([
+  "bad_json", "bad_field", "unsupported_version", "too_large", "bad_base64", "bad_base32", "bad_checksum", "bad_key",
+  "bad_signature", "bad_realm", "realm_not_accepted", "bad_username", "username_policy", "bad_handle", "handle_taken",
+  "ambiguous_handle", "account_mismatch", "wrong_recovery_key", "too_many_events", "bad_kind", "bad_seq", "bad_prev",
+  "time_backwards", "future_time", "bad_time", "wrong_signer", "key_reuse", "bad_receipt", "bad_reason",
+  "account_retired", "no_instance", "stale_version", "fork", "wrong_instance", "stale_rev", "stale_locks", "bad_locks",
+  "kdf_params", "weak_password", "unlock_failed", "wrong_account_key", "bad_data_key", "wrong_challenge",
+  "wrong_recipient", "challenge_unknown", "challenge_expired", "not_home", "wrong_host", "unknown_account",
+  "unauthorized", "rate_limited", "unsupported_browser",
+]);
+
+/** A rootcard error. `code` is one of the stable codes of SPEC §20. */
+class RootcardError extends Error {
+  /** @param {string} code */
+  constructor(code) {
+    super(code);
+    this.name = "RootcardError";
+    this.code = code;
+  }
+}
+
+/** Throw the error `code`. @param {string} code @returns {never} */
+function fail(code) {
+  throw new RootcardError(code);
+}
+
+/** Run `f`, replacing any RootcardError by `code`. */
+function remap(code, f) {
+  try {
+    return f();
+  } catch (e) {
+    if (e instanceof RootcardError) fail(code);
+    throw e;
+  }
+}
+
+return { ERROR_CODES, RootcardError, fail, remap };
+})();
+__modules["json.js"] = (() => {
+// Canonical JSON (SPEC §2): a strict parser and the RFC 8785 serialization of the rootcard subset of JSON.
+// Values are plain objects, arrays, strings, safe integers and booleans. Parsed objects have no prototype.
+
+const { fail } = __modules["errors.js"];
+
+const MAX_SAFE = Number.MAX_SAFE_INTEGER;
+const MAX_DEPTH = 32;
+
+const enc = new TextEncoder();
+const dec = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+
+/** Whether `v` is a plain object (not an array). */
+function isObject(v) {
+  return typeof v === "object" && v !== null && !Array.isArray(v) && !(v instanceof Uint8Array);
+}
+
+/** A new empty object without prototype. */
+function obj(entries) {
+  const o = Object.create(null);
+  if (entries) for (const [k, v] of Object.entries(entries)) o[k] = v;
+  return o;
+}
+
+/** Whether `name` sorts before `other` by UTF-16 code units (RFC 8785 §3.2.3). JS string order is exactly that. */
+function sortedKeys(o) {
+  return Object.keys(o).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+}
+
+/** Check that a value built in code is a rootcard JSON value ([CJ-1]–[CJ-5]). → bad_json */
+function validate(v, depth = 0) {
+  if (typeof v === "string") {
+    if (!v.isWellFormed()) fail("bad_json");
+  } else if (typeof v === "number") {
+    if (!Number.isSafeInteger(v) || Object.is(v, -0)) fail("bad_json");
+  } else if (typeof v === "boolean") {
+    // ok
+  } else if (Array.isArray(v)) {
+    if (depth >= MAX_DEPTH) fail("bad_json");
+    for (const x of v) validate(x, depth + 1);
+  } else if (isObject(v)) {
+    if (depth >= MAX_DEPTH) fail("bad_json");
+    for (const k of Object.keys(v)) {
+      if (!k.isWellFormed()) fail("bad_json");
+      if (v[k] === undefined) fail("bad_json");
+      validate(v[k], depth + 1);
+    }
+  } else {
+    fail("bad_json");
+  }
+}
+
+function writeString(s, out) {
+  out.push('"');
+  for (const ch of s) {
+    const c = ch.codePointAt(0);
+    if (ch === '"') out.push('\\"');
+    else if (ch === "\\") out.push("\\\\");
+    else if (c === 0x08) out.push("\\b");
+    else if (c === 0x09) out.push("\\t");
+    else if (c === 0x0a) out.push("\\n");
+    else if (c === 0x0c) out.push("\\f");
+    else if (c === 0x0d) out.push("\\r");
+    else if (c < 0x20) out.push("\\u00" + c.toString(16).padStart(2, "0"));
+    else out.push(ch);
+  }
+  out.push('"');
+}
+
+function write(v, out) {
+  if (typeof v === "string") writeString(v, out);
+  else if (typeof v === "number") out.push(String(v));
+  else if (typeof v === "boolean") out.push(v ? "true" : "false");
+  else if (Array.isArray(v)) {
+    out.push("[");
+    v.forEach((x, i) => {
+      if (i) out.push(",");
+      write(x, out);
+    });
+    out.push("]");
+  } else {
+    out.push("{");
+    sortedKeys(v).forEach((k, i) => {
+      if (i) out.push(",");
+      writeString(k, out);
+      out.push(":");
+      write(v[k], out);
+    });
+    out.push("}");
+  }
+}
+
+/** `canonical(x)` as a string ([CJ-9]). The value must be valid ([CJ-1]–[CJ-5]). */
+function canonicalString(v) {
+  validate(v);
+  const out = [];
+  write(v, out);
+  return out.join("");
+}
+
+/** `canonical(x)` as UTF-8 bytes ([CJ-9]). */
+function canonical(v) {
+  return enc.encode(canonicalString(v));
+}
+
+/** The object `o` without the member `name` (SPEC §0.1). */
+function without(o, ...names) {
+  const r = obj();
+  for (const k of Object.keys(o)) if (!names.includes(k)) r[k] = o[k];
+  return r;
+}
+
+/** Parse a JSON text strictly ([CJ-6]). → bad_json */
+function parseJson(bytes) {
+  if (typeof bytes === "string") bytes = enc.encode(bytes);
+  if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) fail("bad_json");
+  let text;
+  try {
+    text = dec.decode(bytes);
+  } catch {
+    fail("bad_json");
+  }
+  const p = { s: text, i: 0 };
+  ws(p);
+  const v = value(p, 1);
+  ws(p);
+  if (p.i !== p.s.length) fail("bad_json");
+  return v;
+}
+
+/** Parse with a size limit ([CJ-8]). → too_large, bad_json */
+function parseLimited(bytes, limit) {
+  if (typeof bytes === "string") bytes = enc.encode(bytes);
+  if (bytes.length > limit + Math.floor(limit / 4)) fail("too_large");
+  const v = parseJson(bytes);
+  if (canonical(v).length > limit) fail("too_large");
+  return v;
+}
+
+function ws(p) {
+  while (p.i < p.s.length) {
+    const c = p.s.charCodeAt(p.i);
+    if (c === 0x20 || c === 0x09 || c === 0x0a || c === 0x0d) p.i++;
+    else break;
+  }
+}
+
+function eat(p, lit) {
+  if (p.s.startsWith(lit, p.i)) p.i += lit.length;
+  else fail("bad_json");
+}
+
+function value(p, depth) {
+  const c = p.s[p.i];
+  if (c === "{") {
+    if (depth > MAX_DEPTH) fail("bad_json");
+    p.i++;
+    const o = obj();
+    ws(p);
+    if (p.s[p.i] === "}") {
+      p.i++;
+      return o;
+    }
+    for (;;) {
+      ws(p);
+      if (p.s[p.i] !== '"') fail("bad_json");
+      const k = string(p);
+      ws(p);
+      eat(p, ":");
+      ws(p);
+      const v = value(p, depth + 1);
+      if (Object.prototype.hasOwnProperty.call(o, k)) fail("bad_json");
+      o[k] = v;
+      ws(p);
+      if (p.s[p.i] === ",") p.i++;
+      else if (p.s[p.i] === "}") {
+        p.i++;
+        return o;
+      } else fail("bad_json");
+    }
+  }
+  if (c === "[") {
+    if (depth > MAX_DEPTH) fail("bad_json");
+    p.i++;
+    const a = [];
+    ws(p);
+    if (p.s[p.i] === "]") {
+      p.i++;
+      return a;
+    }
+    for (;;) {
+      ws(p);
+      a.push(value(p, depth + 1));
+      ws(p);
+      if (p.s[p.i] === ",") p.i++;
+      else if (p.s[p.i] === "]") {
+        p.i++;
+        return a;
+      } else fail("bad_json");
+    }
+  }
+  if (c === '"') return string(p);
+  if (c === "t") {
+    eat(p, "true");
+    return true;
+  }
+  if (c === "f") {
+    eat(p, "false");
+    return false;
+  }
+  if (c === "-" || (c >= "0" && c <= "9")) return number(p);
+  fail("bad_json");
+}
+
+function number(p) {
+  const m = /^-?(0|[1-9][0-9]*)/.exec(p.s.slice(p.i, p.i + 20));
+  if (!m) fail("bad_json");
+  const text = m[0];
+  p.i += text.length;
+  const next = p.s[p.i];
+  if (next === "." || next === "e" || next === "E" || (next >= "0" && next <= "9")) fail("bad_json");
+  if (text === "-0" || text.length > 17) fail("bad_json");
+  const n = Number(text);
+  if (!Number.isSafeInteger(n)) fail("bad_json");
+  return n;
+}
+
+function hex4(p) {
+  const h = p.s.slice(p.i, p.i + 4);
+  if (!/^[0-9a-fA-F]{4}$/.test(h)) fail("bad_json");
+  p.i += 4;
+  return parseInt(h, 16);
+}
+
+function string(p) {
+  p.i++;
+  let out = "";
+  for (;;) {
+    if (p.i >= p.s.length) fail("bad_json");
+    const c = p.s.charCodeAt(p.i);
+    if (c === 0x22) {
+      p.i++;
+      return out;
+    }
+    if (c === 0x5c) {
+      p.i++;
+      const e = p.s[p.i++];
+      if (e === '"') out += '"';
+      else if (e === "\\") out += "\\";
+      else if (e === "/") out += "/";
+      else if (e === "b") out += "\b";
+      else if (e === "f") out += "\f";
+      else if (e === "n") out += "\n";
+      else if (e === "r") out += "\r";
+      else if (e === "t") out += "\t";
+      else if (e === "u") {
+        const u = hex4(p);
+        if (u >= 0xd800 && u < 0xdc00) {
+          eat(p, "\\u");
+          const lo = hex4(p);
+          if (!(lo >= 0xdc00 && lo < 0xe000)) fail("bad_json");
+          out += String.fromCharCode(u, lo);
+        } else if (u >= 0xdc00 && u < 0xe000) {
+          fail("bad_json");
+        } else {
+          out += String.fromCharCode(u);
+        }
+      } else fail("bad_json");
+      continue;
+    }
+    if (c < 0x20) fail("bad_json");
+    // A surrogate pair in the decoded text is one scalar value; copy both halves.
+    if (c >= 0xd800 && c < 0xdc00) {
+      out += p.s.slice(p.i, p.i + 2);
+      p.i += 2;
+    } else {
+      out += p.s[p.i];
+      p.i++;
+    }
+  }
+}
+
+return { MAX_SAFE, MAX_DEPTH, isObject, obj, validate, canonicalString, canonical, without, parseJson, parseLimited };
+})();
+__modules["encoding.js"] = (() => {
+// Byte encodings (SPEC §3): unpadded base64url, Crockford base32, hex and UTF-8.
+
+const { fail } = __modules["errors.js"];
+
+const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+const B64_VALUE = new Map([...B64].map((c, i) => [c, i]));
+
+/** Unpadded base64url ([B64-1]). @param {Uint8Array} bytes */
+function base64urlEncode(bytes) {
+  let out = "";
+  for (let i = 0; i < bytes.length; i += 3) {
+    const n = (bytes[i] << 16) | ((bytes[i + 1] ?? 0) << 8) | (bytes[i + 2] ?? 0);
+    const chars = Math.min(3, bytes.length - i) + 1;
+    for (let j = 0; j < chars; j++) out += B64[(n >>> (18 - 6 * j)) & 63];
+  }
+  return out;
+}
+
+/** Strict unpadded base64url decoding ([B64-2]). → bad_base64 */
+function base64urlDecode(text) {
+  if (typeof text !== "string" || text.length % 4 === 1) fail("bad_base64");
+  const out = new Uint8Array(Math.floor((text.length * 3) / 4));
+  let o = 0;
+  for (let i = 0; i < text.length; i += 4) {
+    const chunk = text.slice(i, i + 4);
+    let n = 0;
+    for (let j = 0; j < chunk.length; j++) {
+      const v = B64_VALUE.get(chunk[j]);
+      if (v === undefined) fail("bad_base64");
+      n |= v << (18 - 6 * j);
+    }
+    const len = chunk.length - 1;
+    const unused = len === 1 ? n & 0xffff : len === 2 ? n & 0xff : 0;
+    if (unused !== 0) fail("bad_base64");
+    const b = [(n >>> 16) & 255, (n >>> 8) & 255, n & 255];
+    for (let j = 0; j < len; j++) out[o++] = b[j];
+  }
+  return out;
+}
+
+/** The Crockford base32 alphabet ([B32-1]). */
+const B32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+/** Crockford base32 ([B32-2]). */
+function base32Encode(bytes) {
+  let out = "";
+  let acc = 0;
+  let bits = 0;
+  for (const b of bytes) {
+    acc = ((acc << 8) | b) >>> 0;
+    bits += 8;
+    while (bits >= 5) {
+      bits -= 5;
+      out += B32[(acc >>> bits) & 31];
+    }
+    acc &= (1 << bits) - 1;
+  }
+  if (bits > 0) out += B32[(acc << (5 - bits)) & 31];
+  return out;
+}
+
+/** Strict Crockford base32 decoding of exactly `len` bytes ([B32-3]). → bad_base32 */
+function base32Decode(text, len) {
+  if (typeof text !== "string" || text.length !== Math.ceil((len * 8) / 5)) fail("bad_base32");
+  const out = new Uint8Array(len);
+  let o = 0;
+  let acc = 0;
+  let bits = 0;
+  for (const c of text) {
+    const v = B32.indexOf(c);
+    if (v < 0 || c.length !== 1) fail("bad_base32");
+    acc = (acc << 5) | v;
+    bits += 5;
+    if (bits >= 8) {
+      bits -= 8;
+      out[o++] = (acc >>> bits) & 255;
+      acc &= (1 << bits) - 1;
+    }
+  }
+  if (acc !== 0) fail("bad_base32");
+  return out;
+}
+
+/** Lenient normalization of typed base32 ([B32-4]). */
+function base32Normalize(text) {
+  let out = "";
+  for (const c of text) {
+    if (c === "-" || c === " ") continue;
+    const u = c.length === 1 && c >= "a" && c <= "z" ? c.toUpperCase() : c;
+    out += u === "I" || u === "L" ? "1" : u === "O" ? "0" : u;
+  }
+  return out;
+}
+
+/** Lenient decoding for human input ([B32-4]). → bad_base32 */
+function base32DecodeLenient(text, len) {
+  return base32Decode(base32Normalize(text), len);
+}
+
+/** Lower-case hexadecimal. */
+function hexEncode(bytes) {
+  let s = "";
+  for (const b of bytes) s += b.toString(16).padStart(2, "0");
+  return s;
+}
+
+/** Hexadecimal to bytes. → bad_field */
+function hexDecode(text) {
+  if (text.length % 2 || !/^[0-9a-fA-F]*$/.test(text)) fail("bad_field");
+  const out = new Uint8Array(text.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(text.slice(2 * i, 2 * i + 2), 16);
+  return out;
+}
+
+const te = new TextEncoder();
+/** UTF-8 bytes of a string. */
+function utf8(s) {
+  return te.encode(s);
+}
+
+/** Concatenate byte arrays. */
+function concat(...parts) {
+  const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+  let o = 0;
+  for (const p of parts) {
+    out.set(p, o);
+    o += p.length;
+  }
+  return out;
+}
+
+/** Byte equality (not constant time; use ctEqual for secrets). */
+function bytesEqual(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+/** Constant-time equality of two byte arrays ([IMP-4]). */
+function ctEqual(a, b) {
+  if (a.length !== b.length) return false;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d |= a[i] ^ b[i];
+  return d === 0;
+}
+
+return { base64urlEncode, base64urlDecode, B32, base32Encode, base32Decode, base32Normalize, base32DecodeLenient, hexEncode, hexDecode, utf8, concat, bytesEqual, ctEqual };
+})();
+__modules["labels.js"] = (() => {
+// Domain separation labels (SPEC §5).
+
+/** Version of the wire and storage format described by the specification. */
+const FORMAT_VERSION = 1;
+
+/** Prefix of every domain-separation label (`rootcard/<purpose>/v<n>`). */
+const LABEL_PREFIX = "rootcard/";
+
+/**
+ * Build a domain-separation label, e.g. `label("id", 1) === "rootcard/id/v1"`.
+ * @param {string} purpose
+ * @param {number} [version]
+ * @returns {string}
+ */
+function label(purpose, version = FORMAT_VERSION) {
+  return `${LABEL_PREFIX}${purpose}/v${version}`;
+}
+
+return { FORMAT_VERSION, LABEL_PREFIX, label };
+})();
+__modules["crypto.js"] = (() => {
+// Cryptographic primitives (SPEC §4) over WebCrypto, and domain separation (SPEC §5).
+// Private keys are imported non-extractable for signing and agreement; raw secret buffers are overwritten by the
+// callers that own them ([IMP-2]).
+
+const { fail } = __modules["errors.js"];
+const { canonical } = __modules["json.js"];
+const { concat, utf8 } = __modules["encoding.js"];
+
+const subtle = globalThis.crypto?.subtle;
+
+let support;
+/** Check that WebCrypto has Ed25519 and X25519 ([IMP-3]). → unsupported_browser */
+async function checkSupport() {
+  if (support === undefined) {
+    support = (async () => {
+      if (!subtle) return false;
+      try {
+        await subtle.importKey("raw", new Uint8Array(32).fill(9), { name: "X25519" }, true, []);
+        const k = await subtle.importKey("raw", ED_TEST_KEY, { name: "Ed25519" }, true, ["verify"]);
+        return !!k;
+      } catch {
+        return false;
+      }
+    })();
+  }
+  if (!(await support)) fail("unsupported_browser");
+}
+
+// The Ed25519 public key of RFC 8032 test 1, used only to probe for support.
+const ED_TEST_KEY = new Uint8Array([
+  0xd7, 0x5a, 0x98, 0x01, 0x82, 0xb1, 0x0a, 0xb7, 0xd5, 0x4b, 0xfe, 0xd3, 0xc9, 0x64, 0x07, 0x3a, 0x0e, 0xe1, 0x72,
+  0xf3, 0xda, 0xa6, 0x23, 0x25, 0xaf, 0x02, 0x1a, 0x68, 0xf7, 0x07, 0x51, 0x1a,
+]);
+
+/** `frame(label, m) = utf8(label) ‖ 0x00 ‖ m` ([DS-1]). */
+function frame(label, m) {
+  return concat(utf8(label), new Uint8Array([0]), m);
+}
+
+/** `frame(label, canonical(x))`. */
+function frameObject(label, x) {
+  return frame(label, canonical(x));
+}
+
+/** SHA-256. */
+async function sha256(m) {
+  return new Uint8Array(await subtle.digest("SHA-256", m));
+}
+
+/** HKDF-SHA256 with a 32-byte output ([CRY-5]). */
+async function hkdf(ikm, salt, info) {
+  const key = await subtle.importKey("raw", ikm, "HKDF", false, ["deriveBits"]);
+  return new Uint8Array(await subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt, info }, key, 256));
+}
+
+const ED_PKCS8 = new Uint8Array([0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20]);
+const X_PKCS8 = new Uint8Array([0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x6e, 0x04, 0x22, 0x04, 0x20]);
+
+function b64uToBytes(s) {
+  const b = atob(s.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (s.length % 4)) % 4));
+  return Uint8Array.from(b, (c) => c.charCodeAt(0));
+}
+
+async function importPrivate(prefix, alg, secret, extractable, usages) {
+  const der = concat(prefix, secret);
+  try {
+    return await subtle.importKey("pkcs8", der, { name: alg }, extractable, usages);
+  } finally {
+    der.fill(0);
+  }
+}
+
+async function publicOf(prefix, alg, secret, usages) {
+  const k = await importPrivate(prefix, alg, secret, true, usages);
+  const jwk = await subtle.exportKey("jwk", k);
+  const x = b64uToBytes(jwk.x);
+  jwk.d = "";
+  return x;
+}
+
+/** The Ed25519 public key of a 32-byte seed ([CRY-2]). */
+async function ed25519Public(seed) {
+  return publicOf(ED_PKCS8, "Ed25519", seed, ["sign"]);
+}
+
+/** Import an Ed25519 seed as a non-extractable signing key ([IMP-2]). */
+async function ed25519SigningKey(seed) {
+  return importPrivate(ED_PKCS8, "Ed25519", seed, false, ["sign"]);
+}
+
+/** A deterministic Ed25519 signature ([CRY-8]). `key` is a seed or a key from ed25519SigningKey. */
+async function ed25519Sign(key, m) {
+  const k = key instanceof Uint8Array ? await ed25519SigningKey(key) : key;
+  return new Uint8Array(await subtle.sign("Ed25519", k, m));
+}
+
+// L, p and the small-order encodings of [CRY-3].
+const L = 2n ** 252n + 27742317777372353535851937790883648493n;
+const P = 2n ** 255n - 19n;
+const SMALL_ORDER = [
+  "0100000000000000000000000000000000000000000000000000000000000000",
+  "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+  "0000000000000000000000000000000000000000000000000000000000000000",
+  "0000000000000000000000000000000000000000000000000000000000000080",
+  "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05",
+  "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc85",
+  "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a",
+  "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa",
+];
+const NEG_ZERO = [
+  "0100000000000000000000000000000000000000000000000000000000000080",
+  "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+];
+
+function le(bytes) {
+  let n = 0n;
+  for (let i = bytes.length - 1; i >= 0; i--) n = (n << 8n) | BigInt(bytes[i]);
+  return n;
+}
+
+function hex(b) {
+  let s = "";
+  for (const x of b) s += x.toString(16).padStart(2, "0");
+  return s;
+}
+
+/** [CRY-3] steps 3 and 4 for an encoded point: canonical and not of small order (also [KEY-3]). */
+function ed25519PointOk(e) {
+  if (e.length !== 32) return false;
+  const y = e.slice();
+  y[31] &= 0x7f;
+  if (le(y) >= P) return false;
+  const h = hex(e);
+  return !NEG_ZERO.includes(h) && !SMALL_ORDER.includes(h);
+}
+
+/** Strict Ed25519 verification ([CRY-3]). → bad_signature */
+async function ed25519Verify(publicKey, m, sig) {
+  if (publicKey.length !== 32 || sig.length !== 64) fail("bad_signature");
+  const r = sig.subarray(0, 32);
+  const s = sig.subarray(32);
+  if (le(s) >= L || !ed25519PointOk(publicKey) || !ed25519PointOk(r)) fail("bad_signature");
+  let ok = false;
+  try {
+    const k = await subtle.importKey("raw", publicKey, { name: "Ed25519" }, false, ["verify"]);
+    ok = await subtle.verify("Ed25519", k, sig, m);
+  } catch {
+    ok = false;
+  }
+  if (!ok) fail("bad_signature");
+}
+
+/** The X25519 public key of a 32-byte secret ([CRY-2]). */
+async function x25519Public(secret) {
+  return publicOf(X_PKCS8, "X25519", secret, ["deriveBits"]);
+}
+
+/** X25519 key agreement; an all-zero result fails ([CRY-4]). → bad_key */
+async function x25519(secret, publicKey) {
+  let bits;
+  try {
+    const priv = await importPrivate(X_PKCS8, "X25519", secret, false, ["deriveBits"]);
+    const pub = await subtle.importKey("raw", publicKey, { name: "X25519" }, false, []);
+    bits = new Uint8Array(await subtle.deriveBits({ name: "X25519", public: pub }, priv, 256));
+  } catch {
+    fail("bad_key");
+  }
+  if (bits.every((b) => b === 0)) fail("bad_key");
+  return bits;
+}
+
+/** AES-256-GCM encryption: ciphertext ‖ tag ([CRY-7]). */
+async function aesGcmEncrypt(key, nonce, plaintext, aad) {
+  const k = await subtle.importKey("raw", key, "AES-GCM", false, ["encrypt"]);
+  return new Uint8Array(await subtle.encrypt({ name: "AES-GCM", iv: nonce, additionalData: aad, tagLength: 128 }, k, plaintext));
+}
+
+/** AES-256-GCM decryption. → unlock_failed */
+async function aesGcmDecrypt(key, nonce, ct, aad) {
+  const k = await subtle.importKey("raw", key, "AES-GCM", false, ["decrypt"]);
+  try {
+    return new Uint8Array(await subtle.decrypt({ name: "AES-GCM", iv: nonce, additionalData: aad, tagLength: 128 }, k, ct));
+  } catch {
+    fail("unlock_failed");
+  }
+}
+
+return { checkSupport, frame, frameObject, sha256, hkdf, ed25519Public, ed25519SigningKey, ed25519Sign, ed25519PointOk, ed25519Verify, x25519Public, x25519, aesGcmEncrypt, aesGcmDecrypt };
+})();
+__modules["keys.js"] = (() => {
+// Keys in JSON (SPEC §3.3) and the schema helpers every structure uses ([CJ-11]–[CJ-13]).
+
+const { fail } = __modules["errors.js"];
+const { isObject } = __modules["json.js"];
+const { base64urlDecode, base64urlEncode, base32Decode } = __modules["encoding.js"];
+const { ed25519PointOk } = __modules["crypto.js"];
+
+/** `"<type>:" + b64u(raw)` ([KEY-1]). */
+function formatKey(type, raw) {
+  return `${type}:${base64urlEncode(raw)}`;
+}
+
+/** Parse a key string of the required type ([KEY-1]–[KEY-3]). → bad_key */
+function parseKey(s, type) {
+  if (typeof s !== "string") fail("bad_key");
+  const i = s.indexOf(":");
+  if (i < 0 || s.slice(0, i) !== type) fail("bad_key");
+  let raw;
+  try {
+    raw = base64urlDecode(s.slice(i + 1));
+  } catch {
+    fail("bad_key");
+  }
+  if (raw.length !== 32) fail("bad_key");
+  if (type === "ed25519" && !ed25519PointOk(raw)) fail("bad_key");
+  return raw;
+}
+
+// --- schema helpers (each failure is bad_field unless stated otherwise) ---
+
+function object(v) {
+  if (!isObject(v)) fail("bad_field");
+  return v;
+}
+
+/** [CJ-12] */
+function version(m) {
+  const v = m.v;
+  if (!Object.hasOwn(m, "v") || typeof v !== "number") fail("bad_field");
+  if (v !== 1) fail("unsupported_version");
+}
+
+/** [CJ-11] */
+function members(m, required, optional = []) {
+  for (const k of required) if (!Object.hasOwn(m, k)) fail("bad_field");
+  for (const k of Object.keys(m)) if (!required.includes(k) && !optional.includes(k)) fail("bad_field");
+}
+
+function get(m, k) {
+  if (!Object.hasOwn(m, k)) fail("bad_field");
+  return m[k];
+}
+
+function string(m, k) {
+  const v = get(m, k);
+  if (typeof v !== "string") fail("bad_field");
+  return v;
+}
+
+function int(m, k) {
+  const v = get(m, k);
+  if (typeof v !== "number") fail("bad_field");
+  return v;
+}
+
+function intIn(m, k, lo, hi) {
+  const v = int(m, k);
+  if (v < lo || v > hi) fail("bad_field");
+  return v;
+}
+
+function bool(m, k) {
+  const v = get(m, k);
+  if (typeof v !== "boolean") fail("bad_field");
+  return v;
+}
+
+function member(m, k) {
+  return object(get(m, k));
+}
+
+function array(m, k) {
+  const v = get(m, k);
+  if (!Array.isArray(v)) fail("bad_field");
+  return v;
+}
+
+/** A base64url string of exactly `n` bytes. */
+function bytes(m, k, n) {
+  const s = string(m, k);
+  let b;
+  try {
+    b = base64urlDecode(s);
+  } catch {
+    fail("bad_field");
+  }
+  if (b.length !== n) fail("bad_field");
+  return b;
+}
+
+/** A key string: not a string → bad_field, a bad key → bad_key ([CJ-13]). */
+function key(m, k, type) {
+  return parseKey(string(m, k), type);
+}
+
+/** A 64-byte signature ([KEY-4]). */
+function sig(m, k) {
+  return bytes(m, k, 64);
+}
+
+/** An account id in strict form ([ID-3]). */
+function account(m, k) {
+  const s = string(m, k);
+  checkAccountId(s);
+  return s;
+}
+
+/** [ID-3] → bad_field */
+function checkAccountId(s) {
+  try {
+    base32Decode(s, 32);
+  } catch {
+    fail("bad_field");
+  }
+}
+
+/** A version `{ seq, hash }` ([VER-1]). */
+function versionRef(v) {
+  const m = object(v);
+  members(m, ["seq", "hash"]);
+  intIn(m, "seq", 0, 999);
+  bytes(m, "hash", 32);
+  return { seq: m.seq, hash: m.hash };
+}
+
+return { formatKey, parseKey, object, version, members, get, string, int, intIn, bool, member, array, bytes, key, sig, account, checkAccountId, versionRef };
+})();
+__modules["id.js"] = (() => {
+// Realm, username, inception, account id (SPEC §7), handles and tags (SPEC §8).
+
+const { fail } = __modules["errors.js"];
+const { B32, base32Encode, base64urlEncode } = __modules["encoding.js"];
+const { ed25519Public, ed25519Sign, frameObject, sha256 } = __modules["crypto.js"];
+const { without } = __modules["json.js"];
+const { formatKey } = __modules["keys.js"];
+const { label } = __modules["labels.js"];
+
+/** [RLM-1] → bad_realm */
+function checkRealm(realm) {
+  if (typeof realm !== "string" || !/^[a-z0-9]([a-z0-9._-]{0,62}[a-z0-9])?$/.test(realm)) fail("bad_realm");
+}
+
+/** [USR-1] → bad_username */
+function checkUsername(username) {
+  if (typeof username !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/.test(username)) fail("bad_username");
+}
+
+/** The default username policy ([USR-3]): [USR-1], 3 to 20 characters, beginning with A–Z a–z. */
+function defaultUsernamePolicy(username) {
+  return /^[A-Za-z][A-Za-z0-9_-]{2,19}$/.test(username);
+}
+
+/** [USR-2] */
+function similarUsernames(a, b) {
+  return a.toLowerCase() === b.toLowerCase() && /^[\x00-\x7f]*$/.test(a + b);
+}
+
+/** The account id of an inception ([ID-3]). */
+async function accountId(inception) {
+  return base32Encode(await sha256(frameObject(label("id"), without(inception, "sigs"))));
+}
+
+/** The deterministic inception of an identity ([ID-1], [ID-2]). → bad_realm, bad_username */
+async function inception(keys, realm, username) {
+  checkRealm(realm);
+  checkUsername(username);
+  const recovery = formatKey("ed25519", await ed25519Public(keys.signSeed));
+  const unsigned = { v: 1, kind: "incept", seq: 0, body: { realm, username, recovery } };
+  const sig = await ed25519Sign(keys.signSeed, frameObject(label("event"), unsigned));
+  return { ...unsigned, sigs: [{ key: recovery, sig: base64urlEncode(sig) }] };
+}
+
+/** The tag of an account id ([HDL-1]). */
+function tag(account) {
+  return account.slice(0, 4);
+}
+
+/** `username + "#" + tag` ([HDL-1]). */
+function handle(username, account) {
+  return `${username}#${tag(account)}`;
+}
+
+function lenientChars(s) {
+  let out = "";
+  for (const c of s) {
+    const u = c.length === 1 && c >= "a" && c <= "z" ? c.toUpperCase() : c;
+    const m = u === "I" || u === "L" ? "1" : u === "O" ? "0" : u;
+    if (m.length !== 1 || !B32.includes(m)) return null;
+    out += m;
+  }
+  return out;
+}
+
+/** Parse a typed handle ([HDL-3]). → bad_handle */
+function parseHandle(text) {
+  const at = text.lastIndexOf("#");
+  if (at < 0) fail("bad_handle");
+  const username = text.slice(0, at);
+  try {
+    checkUsername(username);
+  } catch {
+    fail("bad_handle");
+  }
+  const t = text.slice(at + 1);
+  const dash = t.indexOf("-");
+  const t4 = lenientChars(dash < 0 ? t : t.slice(0, dash));
+  if (t4 === null || t4.length !== 4) fail("bad_handle");
+  const result = { username, tag: t4 };
+  if (dash >= 0) {
+    const e = lenientChars(t.slice(dash + 1));
+    if (e === null || e.length < 1 || e.length > 48) fail("bad_handle");
+    result.extension = e;
+  }
+  return result;
+}
+
+/** Whether an identity matches a parsed handle (similar username, [USR-2]). */
+function handleMatches(parsed, username, account) {
+  return similarUsernames(parsed.username, username) && account.startsWith(parsed.tag + (parsed.extension ?? ""));
+}
+
+/** The extended tags of colliding account ids ([HDL-6]), in the order given. */
+function extendedTags(ids) {
+  const distinct = [...new Set(ids)];
+  if (distinct.length < 2) return ids.map(tag);
+  const max = Math.min(...distinct.map((s) => s.length));
+  let n = 5;
+  while (n < max) {
+    const prefixes = distinct.map((s) => s.slice(0, n));
+    if (new Set(prefixes).size === prefixes.length) break;
+    n++;
+  }
+  n = Math.min(n, max);
+  return ids.map((id) => `${id.slice(0, 4)}-${id.slice(4, n)}`);
+}
+
+return { checkRealm, checkUsername, defaultUsernamePolicy, similarUsernames, accountId, inception, tag, handle, parseHandle, handleMatches, extendedTags };
+})();
+__modules["log.js"] = (() => {
+// The identity log (SPEC §9) and versions (SPEC §10). A log state is plain JSON, identical to the Rust crate's
+// `LogState::to_value`, so that hosts can store it ([LOG-16]).
+
+const { fail } = __modules["errors.js"];
+const { base64urlEncode, base64urlDecode, bytesEqual } = __modules["encoding.js"];
+const { ed25519Public, ed25519Sign, ed25519Verify, frameObject, sha256 } = __modules["crypto.js"];
+const { canonical, without, isObject, MAX_SAFE } = __modules["json.js"];
+const s = __modules["keys.js"];
+const { formatKey } = __modules["keys.js"];
+const { accountId, checkRealm, checkUsername, handle } = __modules["id.js"];
+const { label } = __modules["labels.js"];
+
+const MAX_EVENTS = 1000;
+const EVENT_LIMIT = 4096;
+const FUTURE_WINDOW = 600;
+const REASONS = ["register", "revoke", "restore", "fresh"];
+
+/** The message owners sign on an event ([LOG-6]). */
+function eventMessage(e) {
+  return frameObject(label("event"), without(e, "sigs"));
+}
+
+/** The message the primary host signs as its receipt ([LOG-8]). */
+function receiptMessage(e) {
+  return frameObject(label("receipt"), without(e, "sigs"));
+}
+
+/** The event hash ([LOG-5]). */
+async function eventHash(e) {
+  return sha256(eventMessage(e));
+}
+
+/** `home.url` ([LOG-4]). → bad_field */
+function checkUrl(url) {
+  if (typeof url !== "string" || url.length < 1 || url.length > 256 || !/^[\x21-\x7e]+$/.test(url)) fail("bad_field");
+}
+
+function parseHome(m) {
+  s.members(m, ["key", "url"]);
+  const key = s.key(m, "key", "ed25519");
+  checkUrl(s.string(m, "url"));
+  return { key: m.key, keyRaw: key, url: m.url };
+}
+
+/** [LOG-12] step 2 for one event. */
+function parseEvent(v, index) {
+  if (isObject(v) && canonical(v).length > EVENT_LIMIT) fail("too_large");
+  const m = s.object(v);
+  s.version(m);
+  const kind = s.string(m, "kind");
+  if (!["incept", "instance", "rotate_recovery", "retire"].includes(kind)) fail("bad_kind");
+  if ((index === 0) !== (kind === "incept")) fail("bad_kind");
+  if (kind === "incept") s.members(m, ["v", "kind", "seq", "body", "sigs"]);
+  else s.members(m, ["v", "account", "seq", "prev", "kind", "time", "body", "sigs"]);
+  const e = { map: m, kind, seq: s.intIn(m, "seq", 0, MAX_SAFE) };
+  if (kind !== "incept") {
+    e.account = s.account(m, "account");
+    e.prev = s.bytes(m, "prev", 32);
+    e.time = s.intIn(m, "time", 0, MAX_SAFE);
+  } else {
+    e.time = 0;
+  }
+  e.sigs = [];
+  for (const x of s.array(m, "sigs")) {
+    const o = s.object(x);
+    s.members(o, ["key", "sig"]);
+    s.key(o, "key", "ed25519");
+    e.sigs.push({ key: o.key, sig: s.sig(o, "sig") });
+  }
+  const body = s.member(m, "body");
+  if (kind === "incept") {
+    s.members(body, ["realm", "username", "recovery"]);
+    e.realm = s.string(body, "realm");
+    e.username = s.string(body, "username");
+    s.key(body, "recovery", "ed25519");
+    e.recovery = body.recovery;
+  } else if (kind === "instance") {
+    s.members(body, ["account_key", "home", "reason"]);
+    s.key(body, "account_key", "ed25519");
+    e.accountKey = body.account_key;
+    e.home = parseHome(s.member(body, "home"));
+    const reason = s.string(body, "reason");
+    if (!REASONS.includes(reason)) fail("bad_reason");
+    e.reason = reason;
+  } else if (kind === "rotate_recovery") {
+    s.members(body, ["recovery"]);
+    s.key(body, "recovery", "ed25519");
+    e.recovery = body.recovery;
+  } else {
+    s.members(body, []);
+  }
+  return e;
+}
+
+function checkLength(n) {
+  if (n === 0) fail("bad_field");
+  if (n > MAX_EVENTS) fail("too_many_events");
+}
+
+function rawKey(k) {
+  return s.parseKey(k, "ed25519");
+}
+
+/** [LOG-12] step 4 for one event, updating the state `st` (a copy) in place. */
+async function apply(st, e, index, now, receipt) {
+  if (st.retired) fail("account_retired");
+  if (e.account !== st.account) fail("account_mismatch");
+  if (e.seq !== index) fail("bad_seq");
+  if (base64urlEncode(e.prev) !== st.version.hash) fail("bad_prev");
+  if (e.time < st.time) fail("time_backwards");
+  if (now !== undefined && now !== null && e.time > now + FUTURE_WINDOW) fail("future_time");
+  let expected;
+  if (e.kind === "instance") {
+    expected = [st.recovery, e.accountKey];
+    if (receipt) expected.push(e.home.key);
+  } else if (e.kind === "rotate_recovery") expected = [st.recovery, e.recovery];
+  else expected = [st.recovery];
+  if (e.sigs.length !== expected.length || e.sigs.some((x, i) => x.key !== expected[i])) fail("wrong_signer");
+  if (e.kind === "instance") {
+    const ak = e.accountKey;
+    const hk = e.home.key;
+    if (ak === hk || st.keys.includes(ak) || st.homes.includes(ak) || st.keys.includes(hk)) fail("key_reuse");
+  } else if (e.kind === "rotate_recovery") {
+    if (st.keys.includes(e.recovery) || st.homes.includes(e.recovery)) fail("key_reuse");
+  }
+  if (e.reason !== undefined) {
+    const has = st.instance !== undefined;
+    const ok = e.reason === "register" ? !has : e.reason === "fresh" ? true : has;
+    if (!ok) fail("bad_reason");
+  }
+  const msg = eventMessage(e.map);
+  const owners = e.kind === "instance" ? 2 : e.sigs.length;
+  for (let i = 0; i < owners; i++) await ed25519Verify(rawKey(e.sigs[i].key), msg, e.sigs[i].sig);
+  if (e.kind === "instance" && receipt) {
+    try {
+      await ed25519Verify(rawKey(e.sigs[2].key), receiptMessage(e.map), e.sigs[2].sig);
+    } catch {
+      fail("bad_receipt");
+    }
+  }
+  const hash = base64urlEncode(await sha256(msg));
+  if (e.kind === "instance") {
+    st.keys.push(e.accountKey);
+    if (!st.homes.includes(e.home.key)) st.homes.push(e.home.key);
+    st.instance = {
+      hash,
+      seq: index,
+      account_key: e.accountKey,
+      home: { key: e.home.key, url: e.home.url },
+      reason: e.reason,
+    };
+  } else if (e.kind === "rotate_recovery") {
+    st.recovery = e.recovery;
+    st.keys.push(e.recovery);
+  } else if (e.kind === "retire") {
+    st.retired = true;
+    delete st.instance;
+  }
+  st.time = e.time;
+  st.version = { seq: index, hash };
+}
+
+function copyState(st) {
+  const c = {
+    account: st.account,
+    realm: st.realm,
+    username: st.username,
+    handle: st.handle,
+    recovery: st.recovery,
+    retired: st.retired,
+    version: { ...st.version },
+    time: st.time,
+    keys: [...st.keys],
+    homes: [...st.homes],
+  };
+  if (st.instance) c.instance = { ...st.instance, home: { ...st.instance.home } };
+  return c;
+}
+
+/**
+ * Verify a whole log ([LOG-12]) and return its state.
+ * @param {any[]} events
+ * @param {{ realms: string[], now?: number }} options
+ */
+async function verifyLog(events, options) {
+  if (!Array.isArray(events)) fail("bad_field");
+  checkLength(events.length);
+  const parsed = events.map((v, i) => parseEvent(v, i));
+  const inc = parsed[0];
+  if (inc.seq !== 0) fail("bad_seq");
+  checkRealm(inc.realm);
+  if (!options.realms.includes(inc.realm)) fail("realm_not_accepted");
+  checkUsername(inc.username);
+  if (inc.sigs.length !== 1 || inc.sigs[0].key !== inc.recovery) fail("wrong_signer");
+  const msg = eventMessage(inc.map);
+  await ed25519Verify(rawKey(inc.recovery), msg, inc.sigs[0].sig);
+  const account = await accountId(inc.map);
+  const st = {
+    account,
+    realm: inc.realm,
+    username: inc.username,
+    handle: handle(inc.username, account),
+    recovery: inc.recovery,
+    retired: false,
+    version: { seq: 0, hash: base64urlEncode(await sha256(msg)) },
+    time: 0,
+    keys: [inc.recovery],
+    homes: [],
+  };
+  for (let i = 1; i < parsed.length; i++) await apply(st, parsed[i], i, options.now, true);
+  return st;
+}
+
+/** Verify events that extend a verified log state ([LOG-15]). */
+async function extendLog(state, events, options) {
+  const start = state.version.seq + 1;
+  if (start + events.length > MAX_EVENTS) fail("too_many_events");
+  const parsed = events.map((v, i) => parseEvent(v, start + i));
+  const st = copyState(state);
+  for (let i = 0; i < parsed.length; i++) await apply(st, parsed[i], start + i, options.now, true);
+  return st;
+}
+
+/** Check a pending instance ([LOG-9]). */
+async function verifyPending(state, event, now) {
+  const index = state.version.seq + 1;
+  if (index >= MAX_EVENTS) fail("too_many_events");
+  const e = parseEvent(event, index);
+  if (e.kind !== "instance") fail("bad_kind");
+  await apply(copyState(state), e, index, now, false);
+}
+
+/** Compare two valid logs of one account ([VER-2]): `b` relative to `a`. → account_mismatch */
+async function compareLogs(a, b) {
+  if (!a.length || !b.length || !isObject(a[0]) || !isObject(b[0])) fail("bad_field");
+  if ((await accountId(a[0])) !== (await accountId(b[0]))) fail("account_mismatch");
+  const h = async (v) => {
+    if (!isObject(v)) fail("bad_field");
+    return eventHash(v);
+  };
+  if (a.length === b.length) {
+    return bytesEqual(await h(a[a.length - 1]), await h(b[b.length - 1])) ? "same" : "fork";
+  }
+  const [short, long, order] = a.length < b.length ? [a, b, "newer"] : [b, a, "older"];
+  return bytesEqual(await h(short[short.length - 1]), await h(long[short.length - 1])) ? order : "fork";
+}
+
+/** An unsigned event after `state` (`sigs` empty). */
+function unsignedEvent(state, kind, body, time) {
+  return {
+    v: 1,
+    account: state.account,
+    seq: state.version.seq + 1,
+    prev: state.version.hash,
+    kind,
+    time,
+    body,
+    sigs: [],
+  };
+}
+
+/** Append an owner signature ([LOG-6]). */
+async function signEvent(e, seed) {
+  const sig = await ed25519Sign(seed, eventMessage(e));
+  e.sigs = [...e.sigs, { key: formatKey("ed25519", await ed25519Public(seed)), sig: base64urlEncode(sig) }];
+  return e;
+}
+
+/** Append the primary host's receipt ([LOG-8]). */
+async function addReceipt(e, hostSeed) {
+  const sig = await ed25519Sign(hostSeed, receiptMessage(e));
+  e.sigs = [...e.sigs, { key: formatKey("ed25519", await ed25519Public(hostSeed)), sig: base64urlEncode(sig) }];
+  return e;
+}
+
+/** [RK-5] → wrong_recovery_key */
+async function checkRecoveryKey(state, seed) {
+  if (formatKey("ed25519", await ed25519Public(seed)) !== state.recovery) fail("wrong_recovery_key");
+}
+
+/** A pending instance ([LOG-9]). `home` is `{ key: "ed25519:…", url }`. */
+async function pendingInstance(state, recoverySeed, accountSeed, home, reason, time) {
+  await checkRecoveryKey(state, recoverySeed);
+  checkUrl(home.url);
+  const body = {
+    account_key: formatKey("ed25519", await ed25519Public(accountSeed)),
+    home: { key: home.key, url: home.url },
+    reason,
+  };
+  const e = unsignedEvent(state, "instance", body, time);
+  await signEvent(e, recoverySeed);
+  await signEvent(e, accountSeed);
+  return e;
+}
+
+/** A `rotate_recovery` event ([KT-5]). */
+async function rotateRecoveryEvent(state, oldSeed, newSeed, time) {
+  await checkRecoveryKey(state, oldSeed);
+  const e = unsignedEvent(state, "rotate_recovery", { recovery: formatKey("ed25519", await ed25519Public(newSeed)) }, time);
+  await signEvent(e, oldSeed);
+  await signEvent(e, newSeed);
+  return e;
+}
+
+/** A `retire` event ([KT-6]). */
+async function retireEvent(state, recoverySeed, time) {
+  await checkRecoveryKey(state, recoverySeed);
+  const e = unsignedEvent(state, "retire", {}, time);
+  await signEvent(e, recoverySeed);
+  return e;
+}
+
+/** The raw bytes of a b64u hash string. */
+function hashBytes(h) {
+  return base64urlDecode(h);
+}
+
+return { MAX_EVENTS, EVENT_LIMIT, FUTURE_WINDOW, eventMessage, receiptMessage, eventHash, checkUrl, verifyLog, extendLog, verifyPending, compareLogs, unsignedEvent, signEvent, addReceipt, checkRecoveryKey, pendingInstance, rotateRecoveryEvent, retireEvent, hashBytes };
+})();
+__modules["binding.js"] = (() => {
+// The HTTP binding's version and base URLs (HOST_PROTOCOL.md §1, §1.3; SPEC [HST-22]). The core makes no requests;
+// these let hosts, clients and the key tool agree on where endpoints live. Mirrors `rootcard::binding`.
+
+const { fail } = __modules["errors.js"];
+const { checkUrl } = __modules["log.js"];
+
+/**
+ * The version segment of the HTTP binding: every endpoint is under `<base URL>/v0` until 1.0.0, then under `/v1`.
+ * It is never part of a base URL, `home.url` or anything signed.
+ */
+const API_VERSION = "v0";
+
+/** Whether a path segment has the form of an API version (`v0`, `V12`). */
+function isVersionSegment(segment) {
+  return /^[vV][0-9]+$/.test(segment);
+}
+
+function authorityHost(rest) {
+  const authority = rest.split("/")[0];
+  if (authority.startsWith("[")) {
+    const i = authority.indexOf("]");
+    return i < 0 ? "" : authority.slice(0, i + 1);
+  }
+  return authority.split(":")[0];
+}
+
+/**
+ * Check a base URL ([HST-22]): `https://` and a host, an optional port and an optional path without a trailing slash,
+ * query, fragment or user info; plain `http://` only for `localhost`, `127.0.0.1` and `[::1]`; and its last path
+ * segment is not an API version segment. → `bad_field`
+ */
+function checkBaseUrl(url) {
+  checkUrl(url);
+  let rest;
+  if (url.startsWith("https://")) rest = url.slice(8);
+  else if (url.startsWith("http://")) {
+    rest = url.slice(7);
+    if (!["localhost", "127.0.0.1", "[::1]"].includes(authorityHost(rest))) fail("bad_field");
+  } else fail("bad_field");
+  if (/[?#@\\]/.test(rest)) fail("bad_field");
+  const slash = rest.indexOf("/");
+  const authority = slash < 0 ? rest : rest.slice(0, slash);
+  if (authorityHost(authority) === "" || !/^[A-Za-z0-9.\-:[\]]+$/.test(authority)) fail("bad_field");
+  if (slash >= 0) {
+    const segments = rest.slice(slash + 1).split("/");
+    if (segments.some((x) => x === "")) fail("bad_field");
+    if (isVersionSegment(segments[segments.length - 1])) fail("bad_field");
+  }
+}
+
+return { API_VERSION, isVersionSegment, checkBaseUrl };
+})();
+__modules["recovery.js"] = (() => {
+// The recovery key (SPEC §6).
+
+const { fail } = __modules["errors.js"];
+const { B32, base32Decode, base32Encode, base32Normalize, bytesEqual } = __modules["encoding.js"];
+const { ed25519Public, frame, frameObject, hkdf, sha256 } = __modules["crypto.js"];
+const { label } = __modules["labels.js"];
+
+async function checksum(key) {
+  return base32Encode(await sha256(frame(label("recovery/check"), key))).slice(0, 4);
+}
+
+/** The written form `RCR-XXXX-…-CCCC` ([RK-1]). */
+async function formatRecoveryKey(key) {
+  const body = base32Encode(key) + (await checksum(key));
+  const groups = [];
+  for (let i = 0; i < 14; i++) groups.push(body.slice(4 * i, 4 * i + 4));
+  return "RCR-" + groups.join("-");
+}
+
+/** Parse a typed recovery key ([RK-2]). → bad_base32, bad_checksum */
+async function parseRecoveryKey(text) {
+  let s = [...text].filter((c) => c !== "-" && c !== " ").join("");
+  if ([...s].length === 59 && s.slice(0, 3).toUpperCase() === "RCR") s = s.slice(3);
+  if (s.length !== 56 || !/^[\x00-\x7f]*$/.test(s)) fail("bad_base32");
+  const n = base32Normalize(s);
+  for (const c of n) if (!B32.includes(c)) fail("bad_base32");
+  const key = base32Decode(n.slice(0, 52), 32);
+  if (n.slice(52) !== (await checksum(key))) fail("bad_checksum");
+  return key;
+}
+
+/**
+ * Derive an identity's recovery keys ([RK-4]): `signSeed` (Ed25519) and `boxSecret` (X25519).
+ * @returns {Promise<{ signSeed: Uint8Array, boxSecret: Uint8Array }>}
+ */
+async function deriveRecoveryKeys(rk, realm, username) {
+  const ctx = { realm, username };
+  return {
+    signSeed: await hkdf(rk, new Uint8Array(0), frameObject(label("recovery/sign"), ctx)),
+    boxSecret: await hkdf(rk, new Uint8Array(0), frameObject(label("recovery/box"), ctx)),
+  };
+}
+
+/** The public recovery signing key. */
+async function recoverySignPublic(keys) {
+  return ed25519Public(keys.signSeed);
+}
+
+
+
+return { bytesEqual, formatRecoveryKey, parseRecoveryKey, deriveRecoveryKeys, recoverySignPublic };
+})();
+__modules["vaultcheck.js"] = (() => {
+// The vault's structure and signatures (SPEC §11), without any decryption: what hosts need ([VLT-3], [VLT-4]).
+
+const { fail } = __modules["errors.js"];
+const { base64urlDecode, bytesEqual } = __modules["encoding.js"];
+const { ed25519Verify, frameObject, sha256 } = __modules["crypto.js"];
+const { canonical, isObject, without } = __modules["json.js"];
+const s = __modules["keys.js"];
+const { label } = __modules["labels.js"];
+
+const VAULT_LIMIT = 96 * 1024;
+const CONTENTS_LIMIT = 64 * 1024;
+const DATA_LIMIT = 48 * 1024;
+const MAX_SLOTS = 15;
+const MAX_REV = 2 ** 32;
+
+/** Argon2id defaults and bounds ([LCK-6]). */
+const KDF_DEFAULT = Object.freeze({ m: 65536, t: 3, p: 1 });
+const KDF_MIN = Object.freeze({ m: 47104, t: 2, p: 1 });
+
+/** [LCK-6] → kdf_params */
+function checkKdf(k) {
+  if (!(k.p === 1 && k.m >= 47104 && k.m <= 1048576 && k.t >= 2 && k.t <= 16)) fail("kdf_params");
+}
+
+/** [LCK-2] → bad_field */
+function checkLabel(l) {
+  const chars = [...l];
+  if (chars.length < 1 || chars.length > 64 || chars.some((c) => c < " " || c === "\x7f")) fail("bad_field");
+}
+
+/** The grant message signed by the recovery key ([LCK-3]). */
+function grantMessage(grant, account, instance) {
+  return frameObject(label("locks"), { ...without(grant, "sig"), account, instance });
+}
+
+/** The message the account key signs on a vault ([VLT-2]). */
+function vaultMessage(vault) {
+  return frameObject(label("vault"), without(vault, "sig"));
+}
+
+/** The authenticated data of the contents encryption ([VLT-6]). */
+function contentsAad(vault) {
+  return frameObject(label("contents"), without(vault, "nonce", "ct", "sig"));
+}
+
+function parseWrap(m) {
+  s.members(m, ["epk", "nonce", "ct"]);
+  return { epk: s.key(m, "epk", "x25519"), nonce: s.bytes(m, "nonce", 12), ct: s.bytes(m, "ct", 48) };
+}
+
+function parseLock(v) {
+  const m = s.object(v);
+  const kind = s.string(m, "kind");
+  if (kind === "password") {
+    s.members(m, ["id", "kind", "kdf", "auth", "box", "wrap"]);
+    const id = s.string(m, "id");
+    s.bytes(m, "id", 8);
+    const k = s.member(m, "kdf");
+    s.members(k, ["alg", "m", "t", "p", "salt"]);
+    const kdf = { alg: s.string(k, "alg"), m: s.int(k, "m"), t: s.int(k, "t"), p: s.int(k, "p"), salt: s.bytes(k, "salt", 16) };
+    const auth = s.key(m, "auth", "ed25519");
+    const box = s.key(m, "box", "x25519");
+    const wrap = parseWrap(s.member(m, "wrap"));
+    return { kind, id, kdf, auth, box, wrap, value: m };
+  }
+  if (kind === "recovery") {
+    s.members(m, ["id", "kind", "box", "wrap"]);
+    const id = s.string(m, "id");
+    const box = s.key(m, "box", "x25519");
+    return { kind, id, box, boxString: m.box, wrap: parseWrap(s.member(m, "wrap")), value: m };
+  }
+  fail("bad_field");
+}
+
+function parseVault(v) {
+  if (isObject(v) && canonical(v).length > VAULT_LIMIT) fail("too_large");
+  const m = s.object(v);
+  s.version(m);
+  s.members(m, ["v", "account", "instance", "rev", "locks", "nonce", "ct", "sig"]);
+  s.account(m, "account");
+  s.bytes(m, "instance", 32);
+  const rev = s.intIn(m, "rev", 1, MAX_REV);
+  const locks = s.member(m, "locks");
+  s.members(locks, ["grant", "list"]);
+  const grant = s.member(locks, "grant");
+  s.members(grant, ["gen", "slots", "recovery", "sig"]);
+  const gen = s.intIn(grant, "gen", 1, MAX_REV);
+  const slots = [];
+  for (const x of s.array(grant, "slots")) {
+    const o = s.object(x);
+    s.members(o, ["id", "label"]);
+    s.bytes(o, "id", 8);
+    slots.push({ id: s.string(o, "id"), label: s.string(o, "label") });
+  }
+  s.key(grant, "recovery", "x25519");
+  const grantSig = s.sig(grant, "sig");
+  const list = s.array(locks, "list").map(parseLock);
+  s.bytes(m, "nonce", 12);
+  let ct;
+  try {
+    ct = base64urlDecode(s.string(m, "ct"));
+  } catch {
+    fail("bad_field");
+  }
+  if (ct.length < 16) fail("bad_field");
+  const sig = s.sig(m, "sig");
+  return { map: m, grant, rev, gen, slots, list, grantSig, sig };
+}
+
+function checkLockSet(p) {
+  const { slots, list } = p;
+  const unique = new Set(slots.map((x) => x.id)).size === slots.length;
+  const rec = list.filter((l) => l.kind === "recovery");
+  const recoveryOk = rec.length === 1 && rec[0].id === "recovery" && rec[0].boxString === p.grant.recovery;
+  const pw = list.filter((l) => l.kind === "password");
+  const perSlot = pw.length === slots.length && slots.every((x) => pw.filter((l) => l.id === x.id).length === 1);
+  if (slots.length > MAX_SLOTS || !unique || !recoveryOk || !perSlot) fail("bad_locks");
+  for (const x of slots) checkLabel(x.label);
+  for (const l of pw) {
+    const ok32 = (n) => Number.isInteger(n) && n >= 0 && n <= 0xffffffff;
+    if (l.kdf.alg !== "argon2id" || ![l.kdf.m, l.kdf.t, l.kdf.p].every(ok32)) fail("kdf_params");
+    checkKdf(l.kdf);
+  }
+}
+
+/**
+ * Verify a vault against a log state ([VLT-3]), without decrypting it. Returns `{ rev, gen, slots, locks, hints }`.
+ */
+async function verifyVault(vault, state) {
+  const p = parseVault(vault);
+  if (p.map.account !== state.account) fail("account_mismatch");
+  if (state.retired) fail("account_retired");
+  if (!state.instance) fail("no_instance");
+  if (p.map.instance !== state.instance.hash) fail("wrong_instance");
+  checkLockSet(p);
+  await ed25519Verify(s.parseKey(state.recovery, "ed25519"), grantMessage(p.grant, state.account, p.map.instance), p.grantSig);
+  await ed25519Verify(s.parseKey(state.instance.account_key, "ed25519"), vaultMessage(p.map), p.sig);
+  return info(p);
+}
+
+function info(p) {
+  const hints = [];
+  for (const x of p.slots) {
+    const l = p.list.find((y) => y.kind === "password" && y.id === x.id);
+    if (l) hints.push({ id: x.id, label: x.label, kdf: l.value.kdf });
+  }
+  return { rev: p.rev, gen: p.gen, slots: p.slots, locks: p.list, hints };
+}
+
+/** Classify a replacement of `old` by `new` ([VLT-4], [HST-12]). → stale_rev, stale_locks */
+async function vaultChange(oldVault, newVault) {
+  const o = s.object(oldVault);
+  const n = s.object(newVault);
+  if (s.int(n, "rev") <= s.int(o, "rev")) fail("stale_rev");
+  const ol = s.member(o, "locks");
+  const nl = s.member(n, "locks");
+  const og = s.int(s.member(ol, "grant"), "gen");
+  const ng = s.int(s.member(nl, "grant"), "gen");
+  if (ng < og) fail("stale_locks");
+  if (ng > og) return { change: "grant" };
+  const same = (a, b) => {
+    try {
+      return bytesEqual(canonical(a), canonical(b));
+    } catch {
+      return false;
+    }
+  };
+  if (!same(ol.grant, nl.grant)) fail("stale_locks");
+  const olist = s.array(ol, "list");
+  const nlist = s.array(nl, "list");
+  if (olist.length !== nlist.length) fail("stale_locks");
+  const changed = [];
+  for (let i = 0; i < olist.length; i++) if (!same(olist[i], nlist[i])) changed.push(i);
+  if (changed.length === 0) return { change: "data" };
+  if (changed.length > 1) fail("stale_locks");
+  const a = s.object(olist[changed[0]]);
+  const b = s.object(nlist[changed[0]]);
+  if (a.kind !== "password" || b.kind !== "password" || a.id !== b.id) fail("stale_locks");
+  return { change: "password", slot: s.string(b, "id"), new: await sha256(canonical(b)) };
+}
+
+return { VAULT_LIMIT, CONTENTS_LIMIT, DATA_LIMIT, MAX_SLOTS, MAX_REV, KDF_DEFAULT, KDF_MIN, checkKdf, checkLabel, grantMessage, vaultMessage, contentsAad, verifyVault, vaultChange };
+})();
+__modules["profile.js"] = (() => {
+// Arbitrary data: the public profile and data keys (SPEC §12).
+
+const { fail } = __modules["errors.js"];
+const { base64urlEncode } = __modules["encoding.js"];
+const { ed25519Sign, ed25519Verify, frameObject } = __modules["crypto.js"];
+const { canonical, validate, without } = __modules["json.js"];
+const s = __modules["keys.js"];
+const { label } = __modules["labels.js"];
+
+const PROFILE_LIMIT = 16 * 1024;
+const MAX_REV = 2 ** 32;
+
+/** [DAT-4] → bad_data_key */
+function checkDataKey(key) {
+  if (typeof key !== "string" || key.length < 1 || key.length > 64 || !/^[a-z0-9._-]+$/.test(key)) fail("bad_data_key");
+  let rest;
+  if (key.startsWith("user.")) rest = key.slice(5);
+  else if (key.startsWith("app.")) {
+    const r = key.slice(4);
+    const dot = r.indexOf(".");
+    if (dot < 0) fail("bad_data_key");
+    checkAppName(r.slice(0, dot));
+    rest = r.slice(dot + 1);
+  } else fail("bad_data_key");
+  if (rest.length === 0) fail("bad_data_key");
+}
+
+/** An application namespace name ([DAT-4]). → bad_data_key */
+function checkAppName(name) {
+  if (!/^[a-z0-9][a-z0-9-]{0,31}$/.test(name)) fail("bad_data_key");
+}
+
+/** Every key of `data` is valid and its canonical form is at most `limit` bytes. → bad_data_key, too_large */
+function checkData(data, limit) {
+  for (const k of Object.keys(data)) checkDataKey(k);
+  if (canonical(data).length > limit) fail("too_large");
+}
+
+/** Set `key` on behalf of application `app` ([DAT-7]). Returns a new object. → bad_data_key, bad_json */
+function setData(data, app, key, value) {
+  checkDataKey(key);
+  checkAppName(app);
+  if (!key.startsWith("user.") && !key.startsWith(`app.${app}.`)) fail("bad_data_key");
+  validate(value);
+  return { ...data, [key]: value };
+}
+
+/** Remove `key` on behalf of application `app` ([DAT-7]). Returns a new object. → bad_data_key */
+function removeData(data, app, key) {
+  checkDataKey(key);
+  if (!key.startsWith("user.") && !key.startsWith(`app.${app}.`)) fail("bad_data_key");
+  const d = { ...data };
+  delete d[key];
+  return d;
+}
+
+/** The message the account key signs on a profile ([DAT-2]). */
+function publicMessage(profile) {
+  return frameObject(label("public"), without(profile, "sig"));
+}
+
+/** Sign a public profile with the account key. → bad_data_key, too_large */
+async function signPublic(account, instance, rev, data, accountSeed) {
+  checkData(data, PROFILE_LIMIT);
+  const p = { v: 1, account, instance, rev, data };
+  p.sig = base64urlEncode(await ed25519Sign(accountSeed, publicMessage(p)));
+  if (canonical(p).length > PROFILE_LIMIT) fail("too_large");
+  return p;
+}
+
+/** Verify a public profile ([DAT-2]). Returns `{ rev, data }`. */
+async function verifyPublic(profile, state) {
+  if (canonical(profile).length > PROFILE_LIMIT) fail("too_large");
+  const m = s.object(profile);
+  s.version(m);
+  s.members(m, ["v", "account", "instance", "rev", "data", "sig"]);
+  const account = s.account(m, "account");
+  s.bytes(m, "instance", 32);
+  const rev = s.intIn(m, "rev", 1, MAX_REV);
+  const data = s.member(m, "data");
+  const sig = s.sig(m, "sig");
+  if (account !== state.account) fail("account_mismatch");
+  if (state.retired) fail("account_retired");
+  if (!state.instance) fail("no_instance");
+  if (m.instance !== state.instance.hash) fail("wrong_instance");
+  for (const k of Object.keys(data)) checkDataKey(k);
+  await ed25519Verify(s.parseKey(state.instance.account_key, "ed25519"), publicMessage(m), sig);
+  return { rev, data };
+}
+
+return { PROFILE_LIMIT, checkDataKey, checkAppName, checkData, setData, removeData, publicMessage, signPublic, verifyPublic };
+})();
+__modules["messages.js"] = (() => {
+// Challenges and the signed messages of vault fetch, login and password change (SPEC §13).
+
+const { fail } = __modules["errors.js"];
+const { base64urlEncode } = __modules["encoding.js"];
+const { ed25519Sign, ed25519Verify, frameObject } = __modules["crypto.js"];
+const s = __modules["keys.js"];
+const { label } = __modules["labels.js"];
+const { checkUrl } = __modules["log.js"];
+
+const CHALLENGE_LIFETIME = 60;
+
+/** Parse a challenge ([CHL-1]). → bad_field, bad_key */
+function parseChallenge(v) {
+  const m = s.object(v);
+  s.members(m, ["nonce", "host", "realm", "version", "expires"]);
+  s.bytes(m, "nonce", 32);
+  s.key(m, "host", "ed25519");
+  s.string(m, "realm");
+  s.versionRef(s.get(m, "version"));
+  s.int(m, "expires");
+  return m;
+}
+
+/** The login message ([LGN-1] step 5). `host` is a key string, `nonce` b64u. */
+function loginMessage(account, host, lock, nonce, realm, url, version) {
+  return frameObject(label("login"), { account, host, lock, nonce, realm, url, version: { seq: version.seq, hash: version.hash } });
+}
+
+/** The vault fetch message ([FET-1]). */
+function fetchMessage(account, host, lock, nonce, url) {
+  return frameObject(label("fetch"), { account, host, lock, nonce, url });
+}
+
+/** The password change proof message ([CHG-1] step 2). `newLockHash` is b64u. */
+function changeMessage(account, host, lock, newLockHash, nonce, url) {
+  return frameObject(label("change"), { account, host, lock, new: newLockHash, nonce, url });
+}
+
+/**
+ * Sign a login for `challenge` with the account key and the lock's key ([LGN-1] steps 4, 5). → wrong_host, stale_version
+ * @returns {Promise<{account, nonce, version, url, lock, sig, lock_sig}>}
+ */
+async function signLogin(state, challenge, url, lock, accountSeed, lockSeed) {
+  const ch = parseChallenge(challenge);
+  if (!state.instance) fail("no_instance");
+  if (ch.host !== state.instance.home.key || ch.realm !== state.realm) fail("wrong_host");
+  if (ch.version.seq !== state.version.seq || ch.version.hash !== state.version.hash) fail("stale_version");
+  checkUrl(url);
+  const msg = loginMessage(state.account, ch.host, lock, ch.nonce, state.realm, url, state.version);
+  return {
+    account: state.account,
+    nonce: ch.nonce,
+    version: { seq: state.version.seq, hash: state.version.hash },
+    url,
+    lock,
+    sig: base64urlEncode(await ed25519Sign(accountSeed, msg)),
+    lock_sig: base64urlEncode(await ed25519Sign(lockSeed, msg)),
+  };
+}
+
+/** Parse a login request. → bad_field */
+function parseLoginRequest(v) {
+  const m = s.object(v);
+  s.members(m, ["account", "nonce", "version", "url", "lock", "sig", "lock_sig"]);
+  checkUrl(s.string(m, "url"));
+  const lock = s.string(m, "lock");
+  if (lock.length < 1 || lock.length > 16) fail("bad_field");
+  s.account(m, "account");
+  s.bytes(m, "nonce", 32);
+  s.versionRef(s.get(m, "version"));
+  s.sig(m, "sig");
+  s.sig(m, "lock_sig");
+  return m;
+}
+
+/** Verify both signatures of a login request ([LGN-1] step 6). Keys are key strings. → bad_signature */
+async function verifyLogin(request, realm, homeKey, accountKey, lockKey) {
+  const r = parseLoginRequest(request);
+  const msg = loginMessage(r.account, homeKey, r.lock, r.nonce, realm, r.url, r.version);
+  await ed25519Verify(s.parseKey(accountKey, "ed25519"), msg, s.sig(r, "sig"));
+  await ed25519Verify(s.parseKey(lockKey, "ed25519"), msg, s.sig(r, "lock_sig"));
+}
+
+return { CHALLENGE_LIFETIME, parseChallenge, loginMessage, fetchMessage, changeMessage, signLogin, parseLoginRequest, verifyLogin };
+})();
+__modules["proof.js"] = (() => {
+// Proofs of identity (SPEC §14).
+
+const { fail } = __modules["errors.js"];
+const { base64urlEncode } = __modules["encoding.js"];
+const { ed25519Public, ed25519Sign, ed25519Verify, frameObject, sha256 } = __modules["crypto.js"];
+const { utf8 } = __modules["encoding.js"];
+const { validate, without } = __modules["json.js"];
+const s = __modules["keys.js"];
+const { formatKey } = __modules["keys.js"];
+const { label } = __modules["labels.js"];
+const { checkRecoveryKey, verifyLog } = __modules["log.js"];
+
+/** `SHA-256(frame("rootcard/statement/v1", { statement }))` ([PRF-5]). → bad_json */
+async function statementChallenge(statement) {
+  validate(statement);
+  return sha256(frameObject(label("statement"), { statement }));
+}
+
+function checkRecipient(r) {
+  const n = utf8(r).length;
+  if (n < 1 || n > 256) fail("bad_field");
+}
+
+/** Make a proof ([PRF-1], [PRF-2]). `by` is "account" or "recovery"; `challenge` is 32 bytes. */
+async function prove(state, by, seed, challenge, recipient) {
+  checkRecipient(recipient);
+  const pub = formatKey("ed25519", await ed25519Public(seed));
+  const p = { v: 1, by, account: state.account, challenge: base64urlEncode(challenge), recipient };
+  if (by === "account") {
+    if (!state.instance) fail("no_instance");
+    if (state.instance.account_key !== pub) fail("wrong_account_key");
+    p.instance = state.instance.hash;
+  } else {
+    await checkRecoveryKey(state, seed);
+  }
+  p.sig = base64urlEncode(await ed25519Sign(seed, frameObject(label("proof"), p)));
+  return p;
+}
+
+/** Verify a proof against the newest log the verifier knows ([PRF-4]). Returns the log state. */
+async function verifyProof(proof, log, challenge, recipient, options) {
+  const m = s.object(proof);
+  s.version(m);
+  const by = s.string(m, "by");
+  if (by !== "account" && by !== "recovery") fail("bad_field");
+  if (by === "account") s.members(m, ["v", "by", "account", "instance", "challenge", "recipient", "sig"]);
+  else s.members(m, ["v", "by", "account", "challenge", "recipient", "sig"]);
+  const account = s.account(m, "account");
+  if (by === "account") s.bytes(m, "instance", 32);
+  s.bytes(m, "challenge", 32);
+  checkRecipient(s.string(m, "recipient"));
+  const sig = s.sig(m, "sig");
+  const state = await verifyLog(log, options);
+  if (account !== state.account) fail("account_mismatch");
+  if (state.retired) fail("account_retired");
+  if (m.challenge !== base64urlEncode(challenge)) fail("wrong_challenge");
+  if (m.recipient !== recipient) fail("wrong_recipient");
+  let key;
+  if (by === "account") {
+    if (!state.instance) fail("no_instance");
+    if (m.instance !== state.instance.hash) fail("stale_version");
+    key = state.instance.account_key;
+  } else key = state.recovery;
+  await ed25519Verify(s.parseKey(key, "ed25519"), frameObject(label("proof"), without(m, "sig")), sig);
+  return state;
+}
+
+return { statementChallenge, prove, verifyProof };
+})();
+__modules["file.js"] = (() => {
+// The account file and the recovery card (SPEC §15).
+
+const { fail } = __modules["errors.js"];
+const { canonical } = __modules["json.js"];
+const s = __modules["keys.js"];
+const { verifyLog } = __modules["log.js"];
+const { verifyPublic } = __modules["profile.js"];
+const { verifyVault } = __modules["vaultcheck.js"];
+const { accountId, inception, tag } = __modules["id.js"];
+const { deriveRecoveryKeys, formatRecoveryKey, parseRecoveryKey, recoverySignPublic } = __modules["recovery.js"];
+const { formatKey } = __modules["keys.js"];
+
+const FILE_LIMIT = 5 * 1024 * 1024;
+const HOST_DATA_LIMIT = 16 * 1024;
+
+/** Build an account file ([FIL-2]). */
+function exportAccount(state, log, publicProfile, vault, hostData) {
+  const f = {
+    format: "rootcard-account",
+    v: 1,
+    realm: state.realm,
+    account: state.account,
+    handle: state.handle,
+    version: { seq: state.version.seq, hash: state.version.hash },
+    log: [...log],
+  };
+  if (publicProfile !== undefined && publicProfile !== null) f.public = publicProfile;
+  if (vault !== undefined && vault !== null) f.vault = vault;
+  if (hostData !== undefined && hostData !== null) f.host_data = hostData;
+  return f;
+}
+
+/** The suggested file name ([FIL-1]). */
+function accountFileName(state) {
+  return `${state.username}-${tag(state.account)}.rootcard.json`;
+}
+
+/** Import an account file ([FIL-3]). Returns `{ state, log, public?, vault?, hostData? }`. */
+async function importAccount(file, options) {
+  if (canonical(file).length > FILE_LIMIT) fail("too_large");
+  const m = s.object(file);
+  if (m.format !== "rootcard-account") fail("bad_field");
+  s.version(m);
+  s.members(m, ["format", "v", "realm", "account", "handle", "version", "log"], ["public", "vault", "host_data"]);
+  const realm = s.string(m, "realm");
+  const account = s.account(m, "account");
+  const handle = s.string(m, "handle");
+  const version = s.versionRef(s.get(m, "version"));
+  const log = s.array(m, "log");
+  let hostData;
+  if (Object.hasOwn(m, "host_data")) {
+    hostData = s.object(m.host_data);
+    if (canonical(hostData).length > HOST_DATA_LIMIT) fail("too_large");
+  }
+  const state = await verifyLog(log, options);
+  if (state.account !== account || state.realm !== realm || state.handle !== handle ||
+      state.version.seq !== version.seq || state.version.hash !== version.hash) {
+    fail("account_mismatch");
+  }
+  const out = { state, log };
+  if (Object.hasOwn(m, "public")) out.public = { value: m.public, info: await verifyPublic(m.public, state) };
+  if (Object.hasOwn(m, "vault")) out.vault = { value: m.vault, info: await verifyVault(m.vault, state) };
+  if (hostData !== undefined) out.hostData = hostData;
+  return out;
+}
+
+/** Build a recovery card ([CRD-1], [CRD-2]). */
+async function recoveryCard(realm, username, account, key, log) {
+  const c = { format: "rootcard-card", v: 1, realm, username, account, key: await formatRecoveryKey(key) };
+  if (log) c.log = [...log];
+  return c;
+}
+
+/** Read a recovery card ([CRD-3]). Returns `{ realm, username, account, key, keys, log, state }`. */
+async function readCard(card) {
+  const m = s.object(card);
+  if (m.format !== "rootcard-card") fail("bad_field");
+  s.version(m);
+  s.members(m, ["format", "v", "realm", "username", "account", "key"], ["log"]);
+  const realm = s.string(m, "realm");
+  const username = s.string(m, "username");
+  const account = s.account(m, "account");
+  const keyText = s.string(m, "key");
+  const logValue = Object.hasOwn(m, "log") ? s.array(m, "log") : undefined;
+  const key = await parseRecoveryKey(keyText);
+  const keys = await deriveRecoveryKeys(key, realm, username);
+  const options = { realms: [realm] };
+  let log;
+  let state;
+  if (logValue === undefined) {
+    const inc = await inception(keys, realm, username);
+    if ((await accountId(inc)) !== account) fail("account_mismatch");
+    log = [inc];
+    state = await verifyLog(log, options);
+  } else {
+    log = logValue;
+    state = await verifyLog(log, options);
+    if (state.account !== account || state.realm !== realm || state.username !== username) fail("account_mismatch");
+    if (formatKey("ed25519", await recoverySignPublic(keys)) !== state.recovery) fail("wrong_recovery_key");
+  }
+  return { realm, username, account, key, keys, log, state };
+}
+
+/** The printable text form of a recovery card ([CRD-4]). */
+async function cardText(card) {
+  const c = await readCard(card);
+  const groups = (str) => str.match(/.{1,4}/g).join(" ");
+  const key = (await formatRecoveryKey(c.key)).slice(4).replace(/-/g, " ");
+  return (
+    "rootcard recovery card\n\n" +
+    `Handle:     ${c.state.handle}\n` +
+    `Realm:      ${c.realm}\n` +
+    `Account id: ${groups(c.account)}\n\n` +
+    `Recovery key:\n  RCR ${key}\n\n` +
+    "Anyone who has this card controls the identity. Keep it offline and private.\n" +
+    "Only enter the recovery key in the rootcard key tool.\n"
+  );
+}
+
+return { FILE_LIMIT, HOST_DATA_LIMIT, exportAccount, accountFileName, importAccount, recoveryCard, readCard, cardText };
+})();
+__modules["blake2b.js"] = (() => {
+// BLAKE2b (RFC 7693), needed only inside Argon2id ([CRY-1]): WebCrypto has neither. 64-bit words are pairs of 32-bit
+// integers (low, high) in a Uint32Array.
+
+const IV = new Uint32Array([
+  0xf3bcc908, 0x6a09e667, 0x84caa73b, 0xbb67ae85, 0xfe94f82b, 0x3c6ef372, 0x5f1d36f1, 0xa54ff53a, 0xade682d1,
+  0x510e527f, 0x2b3e6c1f, 0x9b05688c, 0xfb41bd6b, 0x1f83d9ab, 0x137e2179, 0x5be0cd19,
+]);
+
+const SIGMA = [
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+  [14, 10, 4, 8, 9, 15, 13, 6, 1, 12, 0, 2, 11, 7, 5, 3],
+  [11, 8, 12, 0, 5, 2, 15, 13, 10, 14, 3, 6, 7, 1, 9, 4],
+  [7, 9, 3, 1, 13, 12, 11, 14, 2, 6, 5, 10, 4, 0, 15, 8],
+  [9, 0, 5, 7, 2, 4, 10, 15, 14, 1, 11, 12, 6, 8, 3, 13],
+  [2, 12, 6, 10, 0, 11, 8, 3, 4, 13, 7, 5, 15, 14, 1, 9],
+  [12, 5, 1, 15, 14, 13, 4, 10, 0, 7, 6, 3, 9, 2, 8, 11],
+  [13, 11, 7, 14, 12, 1, 3, 9, 5, 0, 15, 4, 8, 6, 2, 10],
+  [6, 15, 14, 9, 11, 3, 0, 8, 12, 2, 13, 7, 1, 4, 10, 5],
+  [10, 2, 8, 4, 7, 6, 1, 5, 15, 11, 9, 14, 3, 12, 13, 0],
+].map((r) => r.map((x) => x * 2));
+
+const v = new Uint32Array(32);
+const m = new Uint32Array(32);
+
+function add64(a, b) {
+  const lo = v[a] + v[b];
+  let hi = v[a + 1] + v[b + 1];
+  if (lo >= 0x100000000) hi++;
+  v[a] = lo;
+  v[a + 1] = hi;
+}
+
+function add64m(a, i) {
+  const lo = v[a] + m[i];
+  let hi = v[a + 1] + m[i + 1];
+  if (lo >= 0x100000000) hi++;
+  v[a] = lo;
+  v[a + 1] = hi;
+}
+
+function g(a, b, c, d, x, y) {
+  add64(a, b);
+  add64m(a, x);
+  let xl = v[d] ^ v[a];
+  let xh = v[d + 1] ^ v[a + 1];
+  v[d] = xh;
+  v[d + 1] = xl;
+  add64(c, d);
+  xl = v[b] ^ v[c];
+  xh = v[b + 1] ^ v[c + 1];
+  v[b] = (xl >>> 24) ^ (xh << 8);
+  v[b + 1] = (xh >>> 24) ^ (xl << 8);
+  add64(a, b);
+  add64m(a, y);
+  xl = v[d] ^ v[a];
+  xh = v[d + 1] ^ v[a + 1];
+  v[d] = (xl >>> 16) ^ (xh << 16);
+  v[d + 1] = (xh >>> 16) ^ (xl << 16);
+  add64(c, d);
+  xl = v[b] ^ v[c];
+  xh = v[b + 1] ^ v[c + 1];
+  v[b] = (xh >>> 31) ^ (xl << 1);
+  v[b + 1] = (xl >>> 31) ^ (xh << 1);
+}
+
+function compress(h, block, t, last) {
+  for (let i = 0; i < 16; i++) {
+    v[i] = h[i];
+    v[i + 16] = IV[i];
+  }
+  v[24] ^= t;
+  v[25] ^= t / 0x100000000;
+  if (last) {
+    v[28] = ~v[28];
+    v[29] = ~v[29];
+  }
+  for (let i = 0; i < 32; i++) {
+    m[i] = block[4 * i] | (block[4 * i + 1] << 8) | (block[4 * i + 2] << 16) | (block[4 * i + 3] << 24);
+  }
+  for (let r = 0; r < 12; r++) {
+    const s = SIGMA[r % 10];
+    g(0, 8, 16, 24, s[0], s[1]);
+    g(2, 10, 18, 26, s[2], s[3]);
+    g(4, 12, 20, 28, s[4], s[5]);
+    g(6, 14, 22, 30, s[6], s[7]);
+    g(0, 10, 20, 30, s[8], s[9]);
+    g(2, 12, 22, 24, s[10], s[11]);
+    g(4, 14, 16, 26, s[12], s[13]);
+    g(6, 8, 18, 28, s[14], s[15]);
+  }
+  for (let i = 0; i < 16; i++) h[i] ^= v[i] ^ v[i + 16];
+}
+
+/** BLAKE2b without a key, with an output of `outlen` bytes (1 to 64), over the concatenation of `parts`. */
+function blake2b(outlen, ...parts) {
+  const h = new Uint32Array(16);
+  h.set(IV);
+  h[0] ^= 0x01010000 ^ outlen;
+  const block = new Uint8Array(128);
+  let fill = 0;
+  let t = 0;
+  for (const p of parts) {
+    for (let i = 0; i < p.length; i++) {
+      if (fill === 128) {
+        t += 128;
+        compress(h, block, t, false);
+        fill = 0;
+      }
+      block[fill++] = p[i];
+    }
+  }
+  t += fill;
+  block.fill(0, fill);
+  compress(h, block, t, true);
+  const out = new Uint8Array(outlen);
+  for (let i = 0; i < outlen; i++) out[i] = h[i >> 2] >>> (8 * (i & 3));
+  block.fill(0);
+  h.fill(0);
+  return out;
+}
+
+return { blake2b };
+})();
+__modules["argon2.js"] = (() => {
+// Argon2id, version 0x13 (RFC 9106), the one primitive this package implements itself ([CRY-1]). It supports the
+// general parameters of the RFC (lanes, secret, associated data) so that it can be checked against the RFC vectors;
+// rootcard uses p = 1, no secret and no associated data ([CRY-6]).
+
+const { blake2b } = __modules["blake2b.js"];
+
+function le32(n) {
+  return new Uint8Array([n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255]);
+}
+
+/** H' (RFC 9106 §3.3): variable-length hash of `parts` to `T` bytes. */
+function hPrime(T, ...parts) {
+  if (T <= 64) return blake2b(T, le32(T), ...parts);
+  const out = new Uint8Array(T);
+  const r = Math.ceil(T / 32) - 2;
+  let v = blake2b(64, le32(T), ...parts);
+  out.set(v.subarray(0, 32), 0);
+  for (let i = 1; i < r; i++) {
+    v = blake2b(64, v);
+    out.set(v.subarray(0, 32), i * 32);
+  }
+  out.set(blake2b(T - 32 * r, v), r * 32);
+  return out;
+}
+
+// Scratch space for the compression function: R (256 words) and Q (256 words).
+const R = new Uint32Array(256);
+const Q = new Uint32Array(256);
+
+// a = a + b + 2 * lo(a) * lo(b) on 64-bit words at word offsets a and b of Q (in u32 units: 2a, 2a+1).
+function fBlaMka(a, b) {
+  const al = Q[a];
+  const bl = Q[b];
+  // 64-bit product of the two low halves.
+  const a1 = al >>> 16;
+  const a0 = al & 0xffff;
+  const b1 = bl >>> 16;
+  const b0 = bl & 0xffff;
+  const p00 = a0 * b0;
+  const mid = a1 * b0 + a0 * b1 + (p00 >>> 16);
+  let ph = a1 * b1 + Math.floor(mid / 65536);
+  let pl = (Math.imul(al, bl) >>> 0);
+  // times two
+  ph = ((ph << 1) | (pl >>> 31)) >>> 0;
+  pl = (pl << 1) >>> 0;
+  // a + b
+  let lo = Q[a] + Q[b];
+  let hi = Q[a + 1] + Q[b + 1] + (lo >= 0x100000000 ? 1 : 0);
+  lo >>>= 0;
+  // + product
+  const lo2 = lo + pl;
+  hi = hi + ph + (lo2 >= 0x100000000 ? 1 : 0);
+  Q[a] = lo2;
+  Q[a + 1] = hi;
+}
+
+function rotr(d, n) {
+  const l = Q[d];
+  const h = Q[d + 1];
+  if (n === 32) {
+    Q[d] = h;
+    Q[d + 1] = l;
+  } else if (n < 32) {
+    Q[d] = (l >>> n) | (h << (32 - n));
+    Q[d + 1] = (h >>> n) | (l << (32 - n));
+  } else {
+    const k = n - 32;
+    Q[d] = (h >>> k) | (l << (32 - k));
+    Q[d + 1] = (l >>> k) | (h << (32 - k));
+  }
+}
+
+function xor(d, a) {
+  Q[d] ^= Q[a];
+  Q[d + 1] ^= Q[a + 1];
+}
+
+// GB on 64-bit words with u32 offsets a, b, c, d into Q.
+function gb(a, b, c, d) {
+  fBlaMka(a, b);
+  xor(d, a);
+  rotr(d, 32);
+  fBlaMka(c, d);
+  xor(b, c);
+  rotr(b, 24);
+  fBlaMka(a, b);
+  xor(d, a);
+  rotr(d, 16);
+  fBlaMka(c, d);
+  xor(b, c);
+  rotr(b, 63);
+}
+
+// P on 16 64-bit words whose u32 offsets are in `w`.
+function p(w) {
+  gb(w[0], w[4], w[8], w[12]);
+  gb(w[1], w[5], w[9], w[13]);
+  gb(w[2], w[6], w[10], w[14]);
+  gb(w[3], w[7], w[11], w[15]);
+  gb(w[0], w[5], w[10], w[15]);
+  gb(w[1], w[6], w[11], w[12]);
+  gb(w[2], w[7], w[8], w[13]);
+  gb(w[3], w[4], w[9], w[14]);
+}
+
+const ROWS = [];
+const COLS = [];
+for (let i = 0; i < 8; i++) {
+  ROWS.push(Array.from({ length: 16 }, (_, k) => 2 * (16 * i + k)));
+  COLS.push(Array.from({ length: 16 }, (_, k) => 2 * (2 * i + 16 * (k >> 1) + (k & 1))));
+}
+
+/**
+ * G(X, Y) of RFC 9106 §3.5 into `out` (all Uint32Array views of 256 words). With `xorOut`, the result is XORed into
+ * the existing contents of `out` (passes after the first, version 0x13).
+ */
+function compress(out, outOff, x, xOff, y, yOff, xorOut) {
+  for (let i = 0; i < 256; i++) R[i] = x[xOff + i] ^ y[yOff + i];
+  Q.set(R);
+  for (let i = 0; i < 8; i++) p(ROWS[i]);
+  for (let i = 0; i < 8; i++) p(COLS[i]);
+  if (xorOut) for (let i = 0; i < 256; i++) out[outOff + i] ^= Q[i] ^ R[i];
+  else for (let i = 0; i < 256; i++) out[outOff + i] = Q[i] ^ R[i];
+}
+
+function blockToWords(bytes, mem, off) {
+  for (let i = 0; i < 256; i++) {
+    mem[off + i] = bytes[4 * i] | (bytes[4 * i + 1] << 8) | (bytes[4 * i + 2] << 16) | (bytes[4 * i + 3] << 24);
+  }
+}
+
+/**
+ * Argon2id (RFC 9106) with a `tagLength`-byte tag. `m` is in KiB.
+ * @param {Uint8Array} password
+ * @param {Uint8Array} salt
+ * @param {{ m: number, t: number, p: number, tagLength?: number, secret?: Uint8Array, ad?: Uint8Array }} params
+ */
+function argon2id(password, salt, params) {
+  const { m, t, p: lanes } = params;
+  const T = params.tagLength ?? 32;
+  const K = params.secret ?? new Uint8Array(0);
+  const X = params.ad ?? new Uint8Array(0);
+  if (!(lanes >= 1 && t >= 1 && m >= 8 * lanes && T >= 4)) throw new RangeError("argon2id parameters");
+  const h0 = blake2b(
+    64,
+    le32(lanes), le32(T), le32(m), le32(t), le32(0x13), le32(2),
+    le32(password.length), password, le32(salt.length), salt, le32(K.length), K, le32(X.length), X,
+  );
+  const mPrime = 4 * lanes * Math.floor(m / (4 * lanes));
+  const q = mPrime / lanes;
+  const segment = q / 4;
+  const mem = new Uint32Array(mPrime * 256);
+  const at = (lane, col) => (lane * q + col) * 256;
+  for (let l = 0; l < lanes; l++) {
+    blockToWords(hPrime(1024, h0, le32(0), le32(l)), mem, at(l, 0));
+    blockToWords(hPrime(1024, h0, le32(1), le32(l)), mem, at(l, 1));
+  }
+  const zero = new Uint32Array(256);
+  const input = new Uint32Array(256);
+  const address = new Uint32Array(256);
+  for (let pass = 0; pass < t; pass++) {
+    for (let slice = 0; slice < 4; slice++) {
+      for (let lane = 0; lane < lanes; lane++) {
+        const independent = pass === 0 && slice < 2;
+        if (independent) {
+          input.fill(0);
+          input[0] = pass;
+          input[2] = lane;
+          input[4] = slice;
+          input[6] = mPrime;
+          input[8] = t;
+          input[10] = 2;
+          input[12] = 0; // counter
+        }
+        const nextAddresses = () => {
+          input[12]++;
+          address.fill(0);
+          compress(address, 0, zero, 0, input, 0, false);
+          compress(address, 0, zero, 0, address.slice(), 0, false);
+        };
+        let start = 0;
+        if (pass === 0 && slice === 0) {
+          start = 2;
+          if (independent) nextAddresses();
+        }
+        for (let index = start; index < segment; index++) {
+          const col = slice * segment + index;
+          const prevCol = col === 0 ? q - 1 : col - 1;
+          let j1;
+          let j2;
+          if (independent) {
+            if (index % 128 === 0) nextAddresses();
+            const k = 2 * (index % 128);
+            j1 = address[k];
+            j2 = address[k + 1];
+          } else {
+            const o = at(lane, prevCol);
+            j1 = mem[o];
+            j2 = mem[o + 1];
+          }
+          let refLane = j2 % lanes;
+          if (pass === 0 && slice === 0) refLane = lane;
+          const same = refLane === lane;
+          let area;
+          if (pass === 0) {
+            if (slice === 0) area = index - 1;
+            else if (same) area = slice * segment + index - 1;
+            else area = slice * segment + (index === 0 ? -1 : 0);
+          } else if (same) area = q - segment + index - 1;
+          else area = q - segment + (index === 0 ? -1 : 0);
+          // x = j1^2 >> 32; y = area * x >> 32; z = area - 1 - y
+          const x = Number((BigInt(j1) * BigInt(j1)) >> 32n);
+          const y = Number((BigInt(area) * BigInt(x)) >> 32n);
+          const z = area - 1 - y;
+          const startPos = pass === 0 ? 0 : slice === 3 ? 0 : (slice + 1) * segment;
+          const refCol = (startPos + z) % q;
+          compress(mem, at(lane, col), mem, at(lane, prevCol), mem, at(refLane, refCol), pass > 0);
+        }
+      }
+    }
+  }
+  const c = new Uint32Array(256);
+  for (let l = 0; l < lanes; l++) {
+    const o = at(l, q - 1);
+    for (let i = 0; i < 256; i++) c[i] ^= mem[o + i];
+  }
+  const cb = new Uint8Array(1024);
+  for (let i = 0; i < 256; i++) {
+    cb[4 * i] = c[i];
+    cb[4 * i + 1] = c[i] >>> 8;
+    cb[4 * i + 2] = c[i] >>> 16;
+    cb[4 * i + 3] = c[i] >>> 24;
+  }
+  const tag = hPrime(T, cb);
+  mem.fill(0);
+  cb.fill(0);
+  c.fill(0);
+  return tag;
+}
+
+return { argon2id };
+})();
+__modules["vault.js"] = (() => {
+// The vault cryptography (SPEC §11): password locks, wrapping, contents, unlocking and changes. This module is separate
+// from the verification core so that a server bundle never loads it (ARCHITECTURE.md §4).
+//
+// Functions that need random bytes take `random(n) → Uint8Array` ([IMP-1]). The order of the draws is part of the
+// contract and identical to the Rust crate, so both produce the same bytes from the same stream.
+
+const { fail } = __modules["errors.js"];
+const { base64urlDecode, base64urlEncode, concat, utf8 } = __modules["encoding.js"];
+const { aesGcmDecrypt, aesGcmEncrypt, ed25519Public, ed25519Sign, frameObject, hkdf, sha256, x25519, x25519Public } = __modules["crypto.js"];
+const { argon2id } = __modules["argon2.js"];
+const { canonical, parseLimited } = __modules["json.js"];
+const s = __modules["keys.js"];
+const { formatKey } = __modules["keys.js"];
+const { label } = __modules["labels.js"];
+const { checkData } = __modules["profile.js"];
+const { CONTENTS_LIMIT, DATA_LIMIT, MAX_SLOTS, VAULT_LIMIT, checkKdf, checkLabel, contentsAad, grantMessage, vaultMessage, verifyVault } = __modules["vaultcheck.js"];
+
+const EMPTY = new Uint8Array(0);
+
+/** The password rules ([LCK-8]). → weak_password */
+function checkPassword(password, username) {
+  const n = password.normalize("NFC");
+  if ([...n].length < 12 || utf8(n).length > 1024 || (n.toLowerCase() === username.toLowerCase() && /^[\x00-\x7f]*$/.test(n))) {
+    fail("weak_password");
+  }
+}
+
+/** Derive a password lock's secrets ([LCK-7]): `{ authSeed, boxSecret }`. → kdf_params */
+async function deriveLockSecrets(account, lock, password, kdf, salt) {
+  checkKdf(kdf);
+  const pw = utf8(password.normalize("NFC"));
+  const a = argon2id(pw, salt, { m: kdf.m, t: kdf.t, p: kdf.p });
+  pw.fill(0);
+  const ctx = { account, lock };
+  try {
+    return {
+      authSeed: await hkdf(a, EMPTY, frameObject(label("password/auth"), ctx)),
+      boxSecret: await hkdf(a, EMPTY, frameObject(label("password/box"), ctx)),
+    };
+  } finally {
+    a.fill(0);
+  }
+}
+
+async function wrapKey(shared, epk, box, account, instance, lock) {
+  return hkdf(shared, concat(epk, box), frameObject(label("wrap"), { account, instance, lock }));
+}
+
+/** Wrap the vault key to a lock's `box` ([LCK-9]). Draws: e (32), nonce (12). → bad_key */
+async function wrapVaultKey(vk, box, account, instance, lock, random) {
+  const e = random(32);
+  const nonce = random(12);
+  const epk = await x25519Public(e);
+  const shared = await x25519(e, box);
+  const wk = await wrapKey(shared, epk, box, account, instance, lock);
+  const ct = await aesGcmEncrypt(wk, nonce, vk, EMPTY);
+  e.fill(0);
+  shared.fill(0);
+  wk.fill(0);
+  return { epk: formatKey("x25519", epk), nonce: base64urlEncode(nonce), ct: base64urlEncode(ct) };
+}
+
+/** Unwrap the vault key with a lock secret ([LCK-9]). → unlock_failed, bad_key */
+async function unwrapVaultKey(wrap, secret, box, account, instance, lock) {
+  const pub = await x25519Public(secret);
+  if (formatKey("x25519", pub) !== formatKey("x25519", box)) fail("unlock_failed");
+  const epk = s.parseKey(wrap.epk, "x25519");
+  const shared = await x25519(secret, epk);
+  const wk = await wrapKey(shared, epk, box, account, instance, lock);
+  const vk = await aesGcmDecrypt(wk, base64urlDecode(wrap.nonce), base64urlDecode(wrap.ct), EMPTY);
+  shared.fill(0);
+  wk.fill(0);
+  if (vk.length !== 32) fail("unlock_failed");
+  return vk;
+}
+
+/** Check vault contents ([VLT-7]). → too_large, bad_field, unsupported_version, bad_data_key */
+function checkContents(v) {
+  if (canonical(v).length > CONTENTS_LIMIT) fail("too_large");
+  const m = s.object(v);
+  s.version(m);
+  s.members(m, ["v", "account_seed", "data"], ["known"]);
+  const seed = s.bytes(m, "account_seed", 32);
+  const data = s.member(m, "data");
+  checkData(data, DATA_LIMIT);
+  if (Object.hasOwn(m, "known")) {
+    const k = s.object(m.known);
+    for (const id of Object.keys(k)) {
+      s.checkAccountId(id);
+      const e = s.object(k[id]);
+      s.members(e, ["handle", "version"]);
+      s.string(e, "handle");
+      s.versionRef(s.get(e, "version"));
+    }
+  }
+  return { accountSeed: seed, data, known: m.known };
+}
+
+function contentsValue(c) {
+  const v = { v: 1, account_seed: base64urlEncode(c.accountSeed), data: c.data };
+  if (c.known !== undefined) v.known = c.known;
+  return v;
+}
+
+/**
+ * Unlock a vault ([VLT-8]). `secret` is `{ lock, password }` or `{ recovery: { signSeed, boxSecret } }`.
+ * Returns `{ vaultKey, contents: { accountSeed, data, known }, lock, lockSeed, info }`.
+ */
+async function unlockVault(vault, state, secret) {
+  const info = await verifyVault(vault, state);
+  let lockId;
+  let lockSecret;
+  let lockSeed;
+  if (secret.recovery) {
+    if (!info.locks.find((l) => l.id === "recovery")) fail("bad_locks");
+    lockId = "recovery";
+    lockSecret = secret.recovery.boxSecret;
+    lockSeed = secret.recovery.signSeed;
+  } else {
+    const p = info.locks.find((l) => l.kind === "password" && l.id === secret.lock);
+    if (!p) fail("bad_locks");
+    const ls = await deriveLockSecrets(state.account, secret.lock, secret.password, p.kdf, p.kdf.salt);
+    lockId = secret.lock;
+    lockSecret = ls.boxSecret;
+    lockSeed = ls.authSeed;
+  }
+  const lock = info.locks.find((l) => l.id === lockId);
+  if (!lock) fail("bad_locks");
+  const vk = await unwrapVaultKey(lock.value.wrap, lockSecret, lock.box, state.account, vault.instance, lockId);
+  const pt = await aesGcmDecrypt(vk, base64urlDecode(vault.nonce), base64urlDecode(vault.ct), contentsAad(vault));
+  const contents = checkContents(parseLimited(pt, CONTENTS_LIMIT));
+  pt.fill(0);
+  if (!state.instance) fail("no_instance");
+  if (formatKey("ed25519", await ed25519Public(contents.accountSeed)) !== state.instance.account_key) {
+    fail("wrong_account_key");
+  }
+  return { vaultKey: vk, contents, lock: lockId, lockSeed, info };
+}
+
+/** Sign a grant with the recovery key ([LCK-3]). `recoveryBox` is the raw X25519 public key. */
+async function signGrant(account, instance, gen, slots, recoveryBox, recoverySeed) {
+  const g = { gen, slots: slots.map((x) => ({ id: x.id, label: x.label })), recovery: formatKey("x25519", recoveryBox) };
+  g.sig = base64urlEncode(await ed25519Sign(recoverySeed, grantMessage(g, account, instance)));
+  return g;
+}
+
+/** Encrypt the contents and sign a vault ([VLT-2], [VLT-6]). Draws: the contents nonce (12). */
+async function sealVault(account, instance, rev, grant, list, contents, vaultKey, random) {
+  const cv = contentsValue(contents);
+  checkContents(cv);
+  const plain = canonical(cv);
+  const nonce = random(12);
+  const v = { v: 1, account, instance, rev, locks: { grant, list }, nonce: base64urlEncode(nonce) };
+  v.ct = base64urlEncode(await aesGcmEncrypt(vaultKey, nonce, plain, contentsAad(v)));
+  plain.fill(0);
+  v.sig = base64urlEncode(await ed25519Sign(contents.accountSeed, vaultMessage(v)));
+  if (canonical(v).length > VAULT_LIMIT) fail("too_large");
+  return v;
+}
+
+function kdfValue(kdf, salt) {
+  return { alg: "argon2id", m: kdf.m, t: kdf.t, p: kdf.p, salt: base64urlEncode(salt) };
+}
+
+/** Create a new password lock's public part. Draws: slot id (8), salt (16). Returns `[slot, lockPublic]`. */
+async function newPasswordLock(account, slot, random) {
+  checkLabel(slot.label);
+  const id = base64urlEncode(random(8));
+  const salt = random(16);
+  const kdf = { m: slot.kdf.m, t: slot.kdf.t, p: slot.kdf.p ?? 1 };
+  const ls = await deriveLockSecrets(account, id, slot.password, kdf, salt);
+  const pub = {
+    id,
+    kdf: kdfValue(kdf, salt),
+    auth: formatKey("ed25519", await ed25519Public(ls.authSeed)),
+    box: formatKey("x25519", await x25519Public(ls.boxSecret)),
+  };
+  ls.authSeed.fill(0);
+  ls.boxSecret.fill(0);
+  return [{ id, label: slot.label }, pub];
+}
+
+function passwordLock(pub, wrap) {
+  return { id: pub.id, kind: "password", kdf: pub.kdf, auth: pub.auth, box: pub.box, wrap };
+}
+
+async function buildLocksAndSeal(account, instance, rev, grant, rbox, pairs, contents, vk, random) {
+  const list = [
+    { id: "recovery", kind: "recovery", box: formatKey("x25519", rbox), wrap: await wrapVaultKey(vk, rbox, account, instance, "recovery", random) },
+  ];
+  for (const [, pub] of pairs) {
+    const w = await wrapVaultKey(vk, s.parseKey(pub.box, "x25519"), account, instance, pub.id, random);
+    list.push(passwordLock(pub, w));
+  }
+  return sealVault(account, instance, rev, grant, list, contents, vk, random);
+}
+
+/**
+ * Build the vault of a new instance (`rev` 1, `gen` 1). Draws: vault key (32); for a new slot, id (8) and salt (16);
+ * the recovery wrap (32 + 12); each password wrap (32 + 12) in slot order; the contents nonce (12).
+ * `p`: `{ account, instance, recovery: { signSeed, boxSecret }, contents, keep: [[slot, lockPublic]], add?: slot }`.
+ */
+async function instanceVault(p, random) {
+  const vk = random(32);
+  const pairs = [...p.keep];
+  if (p.add) pairs.push(await newPasswordLock(p.account, p.add, random));
+  const rbox = await x25519Public(p.recovery.boxSecret);
+  const grant = await signGrant(p.account, p.instance, 1, pairs.map(([x]) => x), rbox, p.recovery.signSeed);
+  try {
+    return await buildLocksAndSeal(p.account, p.instance, 1, grant, rbox, pairs, p.contents, vk, random);
+  } finally {
+    vk.fill(0);
+  }
+}
+
+/** The password locks of an unlocked vault to carry over ([KT-3]); `drop` names slots to leave out. */
+function carriedLocks(u, drop = []) {
+  const out = [];
+  for (const x of u.info.slots) {
+    if (drop.includes(x.id)) continue;
+    const l = u.info.locks.find((y) => y.kind === "password" && y.id === x.id);
+    if (l) out.push([{ id: x.id, label: x.label }, { id: l.id, kdf: l.value.kdf, auth: l.value.auth, box: l.value.box }]);
+  }
+  return out;
+}
+
+function idsOf(u, vault) {
+  const m = s.object(vault);
+  const grant = s.member(s.member(m, "locks"), "grant");
+  if (s.int(m, "rev") !== u.info.rev || s.int(grant, "gen") !== u.info.gen) fail("stale_rev");
+  return { account: s.string(m, "account"), instance: s.string(m, "instance"), grant };
+}
+
+/** A data update ([HST-12] case 1): `rev + 1`. Draws: the contents nonce (12). */
+async function updateContents(u, vault, contents, random) {
+  const { account, instance, grant } = idsOf(u, vault);
+  const list = u.info.locks.map((l) => l.value);
+  return sealVault(account, instance, u.info.rev + 1, grant, list, contents, u.vaultKey, random);
+}
+
+/**
+ * A password change ([CHG-1] step 1). Draws: salt (16), wrap (32 + 12), contents nonce (12).
+ * Returns `{ vault, new }` where `new` is `SHA-256(canonical(new lock))`.
+ */
+async function changePassword(u, vault, slot, password, kdf, random) {
+  const { account, instance, grant } = idsOf(u, vault);
+  const index = u.info.locks.findIndex((l) => l.kind === "password" && l.id === slot);
+  if (index < 0) fail("bad_locks");
+  const salt = random(16);
+  const k = { m: kdf.m, t: kdf.t, p: kdf.p ?? 1 };
+  const ls = await deriveLockSecrets(account, slot, password, k, salt);
+  const box = await x25519Public(ls.boxSecret);
+  const pub = { id: slot, kdf: kdfValue(k, salt), auth: formatKey("ed25519", await ed25519Public(ls.authSeed)), box: formatKey("x25519", box) };
+  ls.authSeed.fill(0);
+  ls.boxSecret.fill(0);
+  const lock = passwordLock(pub, await wrapVaultKey(u.vaultKey, box, account, instance, slot, random));
+  const hash = await sha256(canonical(lock));
+  const list = u.info.locks.map((l) => l.value);
+  list[index] = lock;
+  return { vault: await sealVault(account, instance, u.info.rev + 1, grant, list, u.contents, u.vaultKey, random), new: hash };
+}
+
+/** Add a password slot ([KT-4]). Draws: id (8), salt (16), wrap (32 + 12), contents nonce (12). */
+async function addSlot(u, vault, recovery, slot, random) {
+  const { account, instance } = idsOf(u, vault);
+  if (u.info.slots.length >= MAX_SLOTS) fail("bad_locks");
+  const [x, pub] = await newPasswordLock(account, slot, random);
+  const w = await wrapVaultKey(u.vaultKey, s.parseKey(pub.box, "x25519"), account, instance, x.id, random);
+  const slots = [...u.info.slots, x];
+  const list = [...u.info.locks.map((l) => l.value), passwordLock(pub, w)];
+  const grant = await signGrant(account, instance, u.info.gen + 1, slots, await x25519Public(recovery.boxSecret), recovery.signSeed);
+  return sealVault(account, instance, u.info.rev + 1, grant, list, u.contents, u.vaultKey, random);
+}
+
+/** The vault after a recovery-key rotation ([KT-5]). Draws: wrap (32 + 12), contents nonce (12). */
+async function regrant(u, vault, newRecovery, random) {
+  const { account, instance } = idsOf(u, vault);
+  const rbox = await x25519Public(newRecovery.boxSecret);
+  const grant = await signGrant(account, instance, u.info.gen + 1, u.info.slots, rbox, newRecovery.signSeed);
+  const list = [];
+  for (const l of u.info.locks) {
+    if (l.kind === "recovery") {
+      list.push({ id: "recovery", kind: "recovery", box: formatKey("x25519", rbox), wrap: await wrapVaultKey(u.vaultKey, rbox, account, instance, "recovery", random) });
+    } else list.push(l.value);
+  }
+  return sealVault(account, instance, u.info.rev + 1, grant, list, u.contents, u.vaultKey, random);
+}
+
+
+
+return { verifyVault, checkPassword, deriveLockSecrets, wrapVaultKey, unwrapVaultKey, checkContents, unlockVault, signGrant, sealVault, newPasswordLock, instanceVault, carriedLocks, updateContents, changePassword, addSlot, regrant };
+})();
+__modules["account.js"] = (() => {
+// High-level flows (SPEC §18): registration ([CLT-1]), new instances ([KT-3], [KT-4], [KT-8]) and recovery-key
+// rotation ([KT-5]). The random draws are in the same order as the Rust crate's `account` module.
+
+const { fail } = __modules["errors.js"];
+const { base64urlEncode } = __modules["encoding.js"];
+const { inception } = __modules["id.js"];
+const { checkRecoveryKey, eventHash, pendingInstance, rotateRecoveryEvent, verifyLog } = __modules["log.js"];
+const { signPublic } = __modules["profile.js"];
+const { deriveRecoveryKeys } = __modules["recovery.js"];
+const { recoveryCard } = __modules["file.js"];
+const { carriedLocks, checkPassword, instanceVault, regrant } = __modules["vault.js"];
+
+/**
+ * Build a registration ([CLT-1]) from a recovery key the caller generated ([RK-3]). `home` is `{ key, url }` with
+ * a key string. Draws: the account seed (32), then instanceVault with one new slot.
+ * @returns {Promise<{ log, vault, public, card, account }>}
+ */
+async function register(recoveryKey, realm, username, password, slotLabel, home, time, kdf, random) {
+  checkPassword(password, username);
+  const keys = await deriveRecoveryKeys(recoveryKey, realm, username);
+  const inc = await inception(keys, realm, username);
+  const state = await verifyLog([inc], { realms: [realm] });
+  const seed = random(32);
+  const pending = await pendingInstance(state, keys.signSeed, seed, home, "register", time);
+  const instance = base64urlEncode(await eventHash(pending));
+  const vault = await instanceVault(
+    {
+      account: state.account,
+      instance,
+      recovery: keys,
+      contents: { accountSeed: seed, data: {} },
+      keep: [],
+      add: { label: slotLabel, password, kdf },
+    },
+    random,
+  );
+  const pub = await signPublic(state.account, instance, 1, {}, seed);
+  const card = await recoveryCard(realm, username, state.account, recoveryKey);
+  seed.fill(0);
+  keys.signSeed.fill(0);
+  keys.boxSecret.fill(0);
+  return { log: [inc, pending], vault, public: pub, card, account: state.account };
+}
+
+/**
+ * Build a new instance on top of `state` ([KT-3]). `mode` is `{ restore: true }`, `{ revoke: [slot ids] }`,
+ * `{ reset: slot }` or `{ fresh: slot }`, where a slot is `{ label, password, kdf }`. `old` is the current vault
+ * unlocked with the recovery lock (not needed for fresh). Draws: the account seed (32), then instanceVault.
+ * @returns {Promise<{ event, vault, public }>}
+ */
+async function newInstance(state, recovery, old, oldPublicData, mode, home, time, random) {
+  await checkRecoveryKey(state, recovery.signSeed);
+  const seed = random(32);
+  const reason = mode.restore ? "restore" : mode.fresh ? "fresh" : "revoke";
+  const event = await pendingInstance(state, recovery.signSeed, seed, home, reason, time);
+  const instance = base64urlEncode(await eventHash(event));
+  let data = {};
+  let known;
+  let keep = [];
+  let add;
+  let publicData = {};
+  if (!mode.fresh) {
+    if (!old) fail("bad_locks");
+    data = old.contents.data;
+    known = old.contents.known;
+    publicData = oldPublicData ?? {};
+    if (mode.restore) keep = carriedLocks(old, []);
+    else if (mode.revoke) keep = carriedLocks(old, mode.revoke);
+    else add = mode.reset;
+  } else add = mode.fresh;
+  const contents = { accountSeed: seed, data };
+  if (known !== undefined) contents.known = known;
+  const vault = await instanceVault({ account: state.account, instance, recovery, contents, keep, add }, random);
+  const pub = await signPublic(state.account, instance, 1, publicData, seed);
+  seed.fill(0);
+  return { event, vault, public: pub };
+}
+
+/**
+ * Rotate the recovery key ([KT-5]) to `newKey`. `unlocked` is the current vault unlocked. Draws: regrant.
+ * @returns {Promise<{ event, vault, card }>}
+ */
+async function rotateRecovery(state, log, oldKeys, newKey, oldVault, unlocked, time, random) {
+  const next = await deriveRecoveryKeys(newKey, state.realm, state.username);
+  const event = await rotateRecoveryEvent(state, oldKeys.signSeed, next.signSeed, time);
+  const vault = await regrant(unlocked, oldVault, next, random);
+  const card = await recoveryCard(state.realm, state.username, state.account, newKey, [...log, event]);
+  return { event, vault, card };
+}
+
+return { register, newInstance, rotateRecovery };
+})();
+__modules["testing.js"] = (() => {
+// A deterministic byte stream for tests and vectors. Never use it for keys or nonces.
+// The stream is SHA-256(seed ‖ be32(0)) ‖ SHA-256(seed ‖ be32(1)) ‖ …, consumed byte by byte, the same as the Rust
+// crate's `testing::TestRandom`, so both implementations draw identical bytes (SPEC §21).
+
+/**
+ * A deterministic `random(n)` function for tests. It is synchronous; it needs `sha256Sync`, a synchronous SHA-256,
+ * which the tests take from `node:crypto`.
+ * @param {Uint8Array} seed
+ * @param {(m: Uint8Array) => Uint8Array} sha256Sync
+ */
+function testRandom(seed, sha256Sync) {
+  let counter = 0;
+  let buf = new Uint8Array(0);
+  let pos = 0;
+  return (n) => {
+    const out = new Uint8Array(n);
+    for (let i = 0; i < n; i++) {
+      if (pos === buf.length) {
+        const m = new Uint8Array(seed.length + 4);
+        m.set(seed);
+        new DataView(m.buffer).setUint32(seed.length, counter++);
+        buf = sha256Sync(m);
+        pos = 0;
+      }
+      out[i] = buf[pos++];
+    }
+    return out;
+  };
+}
+
+/** Random bytes from the platform's secure generator, for applications ([CRY-1]). Not used by the core itself. */
+function systemRandom(n) {
+  return globalThis.crypto.getRandomValues(new Uint8Array(n));
+}
+
+return { testRandom, systemRandom };
+})();
+// The key tool page (SPEC §18.2), inlined into keytool.html after the library modules. It talks only to hosts the
+// user enters ([KT-1]) and gathers the newest log before signing anything ([KT-2]).
+
+const rc = { ...__modules["index.js"] };
+for (const name of ["errors.js", "json.js", "encoding.js", "labels.js", "binding.js", "crypto.js", "keys.js", "recovery.js", "id.js", "log.js",
+  "vaultcheck.js", "profile.js", "messages.js", "proof.js", "file.js", "argon2.js", "vault.js", "account.js", "testing.js"]) {
+  Object.assign(rc, __modules[name]);
+}
+const $ = (id) => document.getElementById(id);
+const random = (n) => crypto.getRandomValues(new Uint8Array(n));
+const now = () => Math.floor(Date.now() / 1000);
+let current = null; // { keys, key, log, state, vault, public, realm, username, account }
+
+function show(text, ok = true) {
+  $("status").className = ok ? "ok" : "err";
+  $("status").textContent = ok ? "Done." : "Failed.";
+  $("out").textContent = text;
+}
+
+function explain(e) {
+  if (e instanceof rc.RootcardError) {
+    const why = {
+      wrong_recovery_key: "This recovery key is not the identity's current one.",
+      bad_checksum: "The recovery key has a typo.",
+      unlock_failed: "Wrong password or recovery key.",
+      weak_password: "The password is too weak: at least 12 characters, not the username.",
+      fork: "Two versions of the identity's log fork. Extend the branch the primary host holds.",
+      not_home: "This host is not the identity's primary host.",
+      unsupported_browser: "This browser lacks WebCrypto Ed25519 or X25519.",
+    }[e.code];
+    return `${why ?? "Error"} (${e.code})`;
+  }
+  return String(e?.message ?? e);
+}
+
+async function run(f) {
+  for (const b of document.querySelectorAll("button")) b.disabled = true;
+  $("status").className = "";
+  $("status").textContent = "Working…";
+  try {
+    await rc.checkSupport();
+    show(await f());
+  } catch (e) {
+    show(explain(e), false);
+  } finally {
+    for (const b of document.querySelectorAll("button")) b.disabled = false;
+  }
+}
+
+function download(name, value) {
+  const blob = new Blob([rc.canonicalString(value) + "\n"], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
+
+async function readFile(input) {
+  const f = input.files?.[0];
+  if (!f) return undefined;
+  return rc.parseLimited(new Uint8Array(await f.arrayBuffer()), rc.FILE_LIMIT ?? 5 * 1024 * 1024);
+}
+
+function checkUrl(url) {
+  if (!/^https:\/\//.test(url) && !/^http:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(url)) throw new Error(`${url}: hosts are reached over https`);
+  return url.replace(/\/+$/, "");
+}
+
+// A host address as the user typed it: trailing slashes removed, then checked as a base URL ([HST-22]).
+function checkHost(url) {
+  const base = url.replace(/\/+$/, "");
+  try {
+    rc.checkBaseUrl(base);
+  } catch {
+    throw new Error(`${url}: not a host base URL (https://host[:port][/path], without /v0 at the end)`);
+  }
+  return base;
+}
+
+// The API root of a host: every endpoint is under `<base URL>/v0` until 1.0.0 (HOST_PROTOCOL.md §1.3). Base URLs
+// (`home.url`, and `url` in signed messages) never include the version.
+function apiRoot(base) {
+  return `${checkHost(base)}/${rc.API_VERSION}`;
+}
+
+async function http(method, url, body) {
+  const res = await fetch(checkUrl(url), {
+    method,
+    headers: body === undefined ? {} : { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : rc.canonicalString(body),
+    credentials: "omit",
+    referrerPolicy: "no-referrer",
+    cache: "no-store",
+  });
+  const text = await res.text();
+  const value = text ? rc.parseJson(text) : true;
+  if (!res.ok) {
+    const code = value?.error;
+    if (code && rc.ERROR_CODES.includes(code)) throw new rc.RootcardError(code);
+    throw new Error(`${url}: HTTP ${res.status}`);
+  }
+  return value;
+}
+
+function hostList() {
+  return $("hosts").value.split(",").map((s) => s.trim()).filter(Boolean).map(checkHost);
+}
+
+/** [KT-2]: the newest log from the card, the account file and the hosts; a fork stops. */
+async function gather() {
+  let cardValue = await readFile($("cardFile"));
+  if (!cardValue) {
+    const key = await rc.parseRecoveryKey($("rkey").value);
+    const realm = $("realm").value.trim();
+    const username = $("username").value.trim();
+    const keys = await rc.deriveRecoveryKeys(key, realm, username);
+    const inc = await rc.inception(keys, realm, username);
+    cardValue = await rc.recoveryCard(realm, username, await rc.accountId(inc), key);
+  }
+  const card = await rc.readCard(cardValue);
+  const opts = { realms: [card.realm], now: now() };
+  let log = card.log;
+  let vault;
+  let pub;
+  const consider = async (candidate, source) => {
+    await rc.verifyLog(candidate, opts);
+    const order = await rc.compareLogs(log, candidate);
+    if (order === "fork") throw new Error(`${source} holds a log that forks from the one already found. Extend the branch the primary host holds.`);
+    if (order === "newer") log = candidate;
+  };
+  const file = await readFile($("accountFile"));
+  if (file) {
+    const a = await rc.importAccount(file, opts);
+    if (a.state.account !== card.account) throw new Error("The account file is another identity.");
+    await consider(a.log, "the account file");
+    vault = a.vault?.value;
+    pub = a.public?.value;
+  }
+  const hosts = hostList();
+  const st0 = await rc.verifyLog(log, opts);
+  if (st0.instance) hosts.push(st0.instance.home.url);
+  const notes = [];
+  for (const h of [...new Set(hosts)]) {
+    try {
+      const v = await http("GET", `${apiRoot(h)}/id/${card.account}/log`);
+      await consider(v.events, h);
+    } catch (e) {
+      notes.push(`${h}: ${explain(e)}`);
+    }
+  }
+  const state = await rc.verifyLog(log, opts);
+  await rc.checkRecoveryKey(state, card.keys.signSeed);
+  current = { keys: card.keys, key: card.key, card: cardValue, log, state, vault, public: pub };
+  return notes;
+}
+
+function describe(state) {
+  const lines = [
+    `Handle:   ${state.handle}`,
+    `Account:  ${state.account}`,
+    `Realm:    ${state.realm}`,
+    `Version:  seq ${state.version.seq} ${state.version.hash}`,
+  ];
+  if (state.retired) lines.push("Status:   retired");
+  else if (state.instance) lines.push(`Instance: seq ${state.instance.seq} (${state.instance.reason}) at ${state.instance.home.url}`);
+  else lines.push("Instance: none");
+  return lines.join("\n");
+}
+
+async function currentVault() {
+  if (current.vault) {
+    try {
+      return { vault: current.vault, u: await rc.unlockVault(current.vault, current.state, { recovery: current.keys }) };
+    } catch {}
+  }
+  if (!current.state.instance) throw new Error("No instance found: load the account file or enter the primary host.");
+  const base = current.state.instance.home.url;
+  const account = current.state.account;
+  const ch = rc.parseChallenge(await http("POST", `${apiRoot(base)}/id/${account}/challenge`, { purpose: "fetch" }));
+  const sig = await rc.ed25519Sign(current.keys.signSeed, rc.fetchMessage(account, ch.host, "recovery", ch.nonce, base));
+  const v = await http("POST", `${apiRoot(base)}/id/${account}/fetch`, { lock: "recovery", nonce: ch.nonce, url: base, sig: rc.base64urlEncode(sig) });
+  return { vault: v.vault, u: await rc.unlockVault(v.vault, current.state, { recovery: current.keys }) };
+}
+
+async function hostHome(base) {
+  const d = await http("GET", `${apiRoot(base)}/host`);
+  rc.parseKey(d.key, "ed25519");
+  return { key: d.key, url: base };
+}
+
+function newSlot() {
+  const password = $("newPassword").value;
+  rc.checkPassword(password, current.state.username);
+  return { label: $("label").value.trim() || "Password", password, kdf: rc.KDF_DEFAULT };
+}
+
+async function submitInstance(base, mode, old) {
+  const home = await hostHome(base);
+  let publicData;
+  if (current.public) {
+    try {
+      publicData = (await rc.verifyPublic(current.public, current.state)).data;
+    } catch {}
+  }
+  const ni = await rc.newInstance(current.state, current.keys, old, publicData, mode, home, now(), random);
+  const account = current.state.account;
+  await http("POST", `${apiRoot(base)}/id/${account}/instance`, { events: current.log, instance: ni.event, vault: ni.vault, public: ni.public });
+  const v = await http("GET", `${apiRoot(base)}/id/${account}/log`);
+  const state = await rc.verifyLog(v.events, { realms: [current.state.realm], now: now() });
+  const oldHome = current.state.instance?.home.url;
+  let note = "";
+  if (oldHome && oldHome !== base) {
+    try {
+      await http("POST", `${apiRoot(oldHome)}/id/${account}/events`, { events: v.events.slice(current.log.length) });
+    } catch (e) {
+      note = `\nCould not tell the previous primary host: ${explain(e)}`;
+    }
+  }
+  current.log = v.events;
+  current.state = state;
+  current.vault = ni.vault;
+  current.public = ni.public;
+  download(rc.accountFileName(state), rc.exportAccount(state, v.events, ni.public, ni.vault));
+  return describe(state) + "\n\nThe new account file was downloaded." + note;
+}
+
+function refreshSlots(info) {
+  $("slot").replaceChildren(...info.slots.map((s) => new Option(`${s.label} (${s.id})`, s.id)));
+}
+
+async function challengeOf(text) {
+  const t = text.trim();
+  if (/^[0-9a-fA-F]{64}$/.test(t)) return rc.hexDecode(t);
+  return rc.statementChallenge(rc.parseJson(t));
+}
+
+const ops = {
+  async restore() {
+    const { u } = await currentVault();
+    return submitInstance(checkHost($("targetHost").value.trim()), { restore: true }, u);
+  },
+  async fresh() {
+    return submitInstance(checkHost($("targetHost").value.trim()), { fresh: newSlot() }, undefined);
+  },
+  async reset() {
+    const { u } = await currentVault();
+    return submitInstance(current.state.instance.home.url, { reset: newSlot() }, u);
+  },
+  async revoke() {
+    const { u } = await currentVault();
+    const id = $("slot").value;
+    if (!id) throw new Error("Choose a password to revoke.");
+    return submitInstance(current.state.instance.home.url, { revoke: [id] }, u);
+  },
+  async add() {
+    const { vault, u } = await currentVault();
+    const v = await rc.addSlot(u, vault, current.keys, newSlot(), random);
+    await http("PUT", `${apiRoot(current.state.instance.home.url)}/id/${current.state.account}/vault`, { vault: v });
+    current.vault = v;
+    const info = await rc.verifyVault(v, current.state);
+    refreshSlots(info);
+    return "Passwords:\n" + info.slots.map((s) => `  ${s.label} (${s.id})`).join("\n");
+  },
+  async rotate() {
+    const { vault, u } = await currentVault();
+    const newKey = random(32);
+    const r = await rc.rotateRecovery(current.state, current.log, current.keys, newKey, vault, u, now(), random);
+    newKey.fill(0);
+    // The new card is saved and shown before the rotation is sent: once the host has the event, the old key no longer
+    // signs and the new card is the only copy of the new key ([KT-5]).
+    download(`${current.state.username}-new.card.json`, r.card);
+    const text = await rc.cardText(r.card);
+    show(text + "\nSending the rotation… Keep this card.", true);
+    try {
+      await http("POST", `${apiRoot(current.state.instance.home.url)}/id/${current.state.account}/events`, { events: [r.event], vault: r.vault });
+    } catch (e) {
+      throw new Error(
+        `${explain(e)}\n\nThe rotation may or may not have reached the primary host. Keep both cards: the new card ` +
+          `below (also downloaded) and the old one. Load the identity with the old card: if it answers that the ` +
+          `recovery key is not the current one, the rotation arrived and the new card is current.\n\n${text}`,
+      );
+    }
+    current = null;
+    $("actions").hidden = true;
+    return text + "\nThe new card was downloaded. Destroy the old card, then load the new one.";
+  },
+  async retire() {
+    if ($("retireConfirm").value !== current.state.username) throw new Error("Type the username to confirm.");
+    const ev = await rc.retireEvent(current.state, current.keys.signSeed, now());
+    const base = current.state.instance?.home.url ?? hostList()[0];
+    if (!base) throw new Error("Enter a host.");
+    await http("POST", `${apiRoot(base)}/id/${current.state.account}/events`, { events: [ev] });
+    return `${current.state.handle} is retired.`;
+  },
+  async card() {
+    return rc.cardText(current.card);
+  },
+  async prove() {
+    const p = await rc.prove(current.state, "recovery", current.keys.signSeed, await challengeOf($("proofStatement").value), $("proofRecipient").value);
+    return rc.canonicalString(p);
+  },
+};
+
+$("version").textContent = ROOTCARD_VERSION;
+$("load").addEventListener("click", () =>
+  run(async () => {
+    const notes = await gather();
+    $("actions").hidden = false;
+    let extra = "";
+    try {
+      const { u } = await currentVault();
+      refreshSlots(u.info);
+    } catch (e) {
+      extra = `\n(Vault not available: ${explain(e)})`;
+    }
+    return describe(current.state) + extra + (notes.length ? "\n\n" + notes.join("\n") : "");
+  }),
+);
+for (const b of document.querySelectorAll("[data-op]")) {
+  b.addEventListener("click", () => run(() => (current ? ops[b.dataset.op]() : Promise.reject(new Error("Load the identity first.")))));
+}
+$("create").addEventListener("click", () =>
+  run(async () => {
+    const realm = $("nRealm").value.trim();
+    const username = $("nUser").value.trim();
+    const rk = random(32);
+    const base = $("nHost").value.trim();
+    let card;
+    let file;
+    let state;
+    if (base) {
+      const home = await hostHome(checkHost(base));
+      const reg = await rc.register(rk, realm, username, $("nPassword").value, "Password", home, now(), rc.KDF_DEFAULT, random);
+      rk.fill(0);
+      // The card is saved before anything is sent: once the host has the identity, the card is the only copy of its
+      // recovery key ([CLT-1]).
+      download(`${username}-${rc.tag(reg.account)}.card.json`, reg.card);
+      await http("POST", `${apiRoot(home.url)}/id/register`, { log: reg.log, vault: reg.vault, public: reg.public });
+      const v = await http("GET", `${apiRoot(home.url)}/id/${reg.account}/log`);
+      state = await rc.verifyLog(v.events, { realms: [realm], now: now() });
+      card = reg.card;
+      file = rc.exportAccount(state, v.events, reg.public, reg.vault);
+    } else {
+      const keys = await rc.deriveRecoveryKeys(rk, realm, username);
+      const inc = await rc.inception(keys, realm, username);
+      state = await rc.verifyLog([inc], { realms: [realm] });
+      card = await rc.recoveryCard(realm, username, state.account, rk);
+      file = rc.exportAccount(state, [inc]);
+    }
+    rk.fill(0);
+    if (!base) download(`${username}-${rc.tag(state.account)}.card.json`, card);
+    download(rc.accountFileName(state), file);
+    return (await rc.cardText(card)) + "\n" + describe(state) + "\n\nThe card and the account file were downloaded. Keep the card offline.";
+  }),
+);
+$("verify").addEventListener("click", () =>
+  run(async () => {
+    const v = rc.parseJson($("vLog").value);
+    const log = Array.isArray(v) ? v : v.log;
+    const realm = log?.[0]?.body?.realm;
+    const st = await rc.verifyProof(rc.parseJson($("vProof").value), log, await challengeOf($("vStatement").value), $("vRecipient").value, { realms: [realm], now: now() });
+    return `Valid proof by ${st.handle}\n\n` + describe(st);
+  }),
+);
+
+})();
+</script>
+</body>
+</html>
