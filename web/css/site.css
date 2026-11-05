@@ -450,3 +450,6 @@ th.us { color: var(--teal-200); }
 .idcard.placeholder { filter: grayscale(0.6) brightness(0.7); }
 .center-row { justify-content: center; }
 a.feature { color: inherit; display: block; } a.feature:hover { text-decoration: none; color: inherit; }
+.nav a.nav-gh { display: inline-flex; align-items: center; gap: 0.45rem; }
+.btn svg { flex: none; }
+@media (min-width: 861px) and (max-width: 1100px) { .nav-gh span { display: none; } }

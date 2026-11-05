@@ -63,8 +63,8 @@ state.handle    <span class="c">// "Astra#3F9C", for display</span></pre>
           storage and secrets to you. Implement three storage traits (identities with compare-and-swap, single-use
           challenges, sessions), pass your clock and random bytes, and wire <code>http::route</code> into any HTTP
           server.</p>
-        <p class="muted">This site is exactly that: an axum server with SQLite storage. Its source is a good starting
-          point.</p>
+        <p class="muted">This site is exactly that: an axum server with SQLite storage. <a href="https://github.com/rootcard/site">Its
+          source</a> is a good starting point.</p>
         <ul class="muted">
           <li>Hosts never see a password and never run Argon2id.</li>
           <li>Build the core without its <code>vault</code> feature.</li>
@@ -182,6 +182,8 @@ rk.fill(0);
         <a class="btn" href="https://github.com/Hexagon/rootcard/blob/main/docs/CONCEPTS.md">Concepts</a>
         <a class="btn" href="https://github.com/Hexagon/rootcard/blob/main/docs/THREAT_MODEL.md">Threat model</a>
         <a class="btn" href="https://github.com/Hexagon/rootcard/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+        <a class="btn btn-primary" href="https://github.com/Hexagon/rootcard">rootcard on GitHub</a>
+        <a class="btn btn-ghost" href="https://github.com/rootcard/site">This site's source</a>
       </div>
     </div>
   </section>
