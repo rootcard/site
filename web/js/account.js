@@ -265,7 +265,7 @@ $("passwordForm").addEventListener("submit", (e) => {
       if (pw !== $("newPassword2").value) throw new Error("The passwords do not match.");
       status(st, "busy", "Building the new lock (Argon2id). This takes a few seconds…");
       // [CHG-1]: the new vault, then a change proof signed with the old lock's key over the new lock's hash.
-      const changed = await work("changePassword", S.u, S.vault, S.lock, pw, rc.KDF_DEFAULT);
+      const changed = await work("changePassword", S.u, S.vault, S.lock, pw, S.state.username, rc.KDF_DEFAULT);
       const ch = rc.parseChallenge(await http("POST", `/id/${S.state.account}/challenge`, { purpose: "change" }));
       if (ch.host !== S.state.instance.home.key) throw new rc.RootcardError("wrong_host");
       const msg = rc.changeMessage(S.state.account, ch.host, S.lock, rc.base64urlEncode(changed.new), ch.nonce, BASE);

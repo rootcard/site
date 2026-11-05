@@ -13,9 +13,9 @@ export { canonical, canonicalString, parseJson, parseLimited, validate } from ".
 export {
   base64urlEncode, base64urlDecode, base32Encode, base32Decode, base32DecodeLenient, hexEncode, hexDecode,
 } from "./encoding.js";
-export { checkSupport, sha256, ed25519Public, ed25519Sign, ed25519Verify, ed25519SigningKey } from "./crypto.js";
+export { checkSupport, sha256, ed25519Public, ed25519PublicIs, ed25519Sign, ed25519Verify, ed25519SigningKey, usableSeed } from "./crypto.js";
 export { formatKey, parseKey } from "./keys.js";
-export { formatRecoveryKey, parseRecoveryKey, deriveRecoveryKeys } from "./recovery.js";
+export { formatRecoveryKey, parseRecoveryKey, deriveRecoveryKeys, newRecoveryKey, checkNewRecoveryKey } from "./recovery.js";
 export {
   checkRealm, checkUsername, defaultUsernamePolicy, similarUsernames, accountId, inception, tag, handle, parseHandle,
   handleMatches, extendedTags,

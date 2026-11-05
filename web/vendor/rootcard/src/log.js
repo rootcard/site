@@ -3,7 +3,7 @@
 
 import { fail } from "./errors.js";
 import { base64urlEncode, base64urlDecode, bytesEqual } from "./encoding.js";
-import { ed25519Public, ed25519Sign, ed25519Verify, frameObject, sha256 } from "./crypto.js";
+import { ed25519Public, ed25519PublicIs, ed25519Sign, ed25519Verify, frameObject, sha256 } from "./crypto.js";
 import { canonical, without, isObject, MAX_SAFE } from "./json.js";
 import * as s from "./keys.js";
 import { formatKey } from "./keys.js";
@@ -275,7 +275,7 @@ export async function addReceipt(e, hostSeed) {
 
 /** [RK-5] → wrong_recovery_key */
 export async function checkRecoveryKey(state, seed) {
-  if (formatKey("ed25519", await ed25519Public(seed)) !== state.recovery) fail("wrong_recovery_key");
+  if (!(await ed25519PublicIs(seed, s.parseKey(state.recovery, "ed25519")))) fail("wrong_recovery_key");
 }
 
 /** A pending instance ([LOG-9]). `home` is `{ key: "ed25519:…", url }`. */

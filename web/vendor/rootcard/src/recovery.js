@@ -2,7 +2,7 @@
 
 import { fail } from "./errors.js";
 import { B32, base32Decode, base32Encode, base32Normalize, bytesEqual } from "./encoding.js";
-import { ed25519Public, frame, frameObject, hkdf, sha256 } from "./crypto.js";
+import { DRAW_ATTEMPTS, ed25519Public, frame, frameObject, hkdf, sha256, usableSeed } from "./crypto.js";
 import { label } from "./labels.js";
 
 async function checksum(key) {
@@ -39,6 +39,28 @@ export async function deriveRecoveryKeys(rk, realm, username) {
     signSeed: await hkdf(rk, new Uint8Array(0), frameObject(label("recovery/sign"), ctx)),
     boxSecret: await hkdf(rk, new Uint8Array(0), frameObject(label("recovery/box"), ctx)),
   };
+}
+
+/**
+ * Generate a recovery key for an identity ([RK-3]): 32 random bytes, drawn again while the derived signing seed is
+ * unusable ([CRY-9]). Draws: 32 bytes per attempt. → bad_key only for a broken generator.
+ */
+export async function newRecoveryKey(realm, username, random) {
+  for (let i = 0; i < DRAW_ATTEMPTS; i++) {
+    const rk = random(32);
+    const keys = await deriveRecoveryKeys(rk, realm, username);
+    const ok = usableSeed(keys.signSeed);
+    keys.signSeed.fill(0);
+    keys.boxSecret.fill(0);
+    if (ok) return rk;
+    rk.fill(0);
+  }
+  fail("bad_key");
+}
+
+/** A new recovery key must give a usable signing seed ([CRY-9]). → bad_key */
+export function checkNewRecoveryKey(keys) {
+  if (!usableSeed(keys.signSeed)) fail("bad_key");
 }
 
 /** The public recovery signing key. */
