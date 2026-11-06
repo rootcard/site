@@ -411,6 +411,7 @@ th.us { color: var(--teal-200); }
 .kv dt { color: var(--faint); }
 .kv dd { margin: 0; word-break: break-all; }
 .kv dd.mono { font-size: 0.85rem; }
+.kv dd .hint { word-break: normal; font-family: var(--sans); }
 
 .tabs { display: flex; gap: 0.3rem; border-bottom: 1px solid var(--line); margin-bottom: 1.4rem; overflow-x: auto; }
 .tabs button { font: inherit; font-weight: 600; font-size: 0.95rem; background: none; border: 0; color: var(--muted); padding: 0.7rem 0.9rem; border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; }

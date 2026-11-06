@@ -102,6 +102,11 @@ await page.waitForSelector("#result:not([hidden])", { timeout: 20000 }).catch(as
   throw e;
 });
 step("card lookup: " + (await page.textContent("#rAbout")));
+// The public half is never labelled "Recovery key", the name of the secret the key tool asks for ([PWR-6]).
+const factLabels = await page.$$eval("#rFacts dt", (ds) => ds.map((d) => d.textContent));
+if (factLabels.some((l) => /recovery key/i.test(l)) || !factLabels.includes("Root public key")) {
+  problems.push(`public key mislabelled on /card: ${factLabels.join(", ")}`);
+}
 await page.screenshot({ path: `${shots}/card.png` });
 for (const p of ["/developers", "/keytool", "/nope"]) {
   await page.goto(BASE + p);

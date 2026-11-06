@@ -8,12 +8,18 @@ renderCard(card, { username: "Astra", realm: REALM });
 card.classList.add("placeholder");
 tilt(card);
 
-function fact(dl, k, v, mono) {
+function fact(dl, k, v, mono, note) {
   const dt = document.createElement("dt");
   dt.textContent = k;
   const dd = document.createElement("dd");
   dd.textContent = v;
   if (mono) dd.className = "mono";
+  if (note) {
+    const n = document.createElement("span");
+    n.className = "hint";
+    n.textContent = note;
+    dd.append(n);
+  }
   dl.append(dt, dd);
 }
 
@@ -74,10 +80,12 @@ async function lookup(q) {
     fact(dl, "Status", state.retired ? "retired" : state.instance ? "active" : "no instance");
     if (state.instance) fact(dl, "Home", state.instance.home.url);
     fact(dl, "Log", `${log.length} event${log.length === 1 ? "" : "s"}, version ${state.version.seq}`);
-    fact(dl, "Recovery key", state.recovery, true);
+    // The public half of the recovery key. Never label it "Recovery key": that is the secret on the recovery card,
+    // and a page that shows a "recovery key" teaches that one belongs on websites ([PWR-6]).
+    fact(dl, "Root public key", state.recovery, true, "Public. The secret recovery key is only on the owner's recovery card.");
     const checks = $("rChecks");
     checks.replaceChildren(
-      li("The account id is the SHA-256 of the inception, which the recovery key signed."),
+      li("The account id is the SHA-256 of the inception, whose signature verifies with the root public key."),
       li(`Every one of the ${log.length} log events links to the one before and carries the signatures it needs.`),
     );
     if (state.instance) checks.append(li("The current instance carries the home's receipt."));
