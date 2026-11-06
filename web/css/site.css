@@ -213,7 +213,6 @@ input[aria-invalid="true"] { border-color: var(--danger); }
 .status { min-height: 1.6rem; margin-top: 1rem; }
 .badge { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 0.3rem 0.65rem; border-radius: 999px; border: 1px solid var(--line-2); color: var(--muted); background: var(--surface-2); }
 .badge.ok { color: var(--ok); border-color: rgba(78, 211, 154, 0.35); background: rgba(78, 211, 154, 0.08); }
-.badge.teal { color: var(--teal-200); border-color: rgba(63, 176, 198, 0.4); background: rgba(63, 176, 198, 0.1); }
 .badge.warn { color: var(--warn); border-color: rgba(242, 178, 92, 0.35); background: rgba(242, 178, 92, 0.08); }
 .dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06); }
 
@@ -337,8 +336,6 @@ section { padding: clamp(3.5rem, 8vw, 6rem) 0; }
 .feature:hover { border-color: var(--line-2); transform: translateY(-2px); }
 .feature p { color: var(--muted); margin: 0; font-size: 0.97rem; }
 .feature h3 { font-size: 1.08rem; margin-bottom: 0.45rem; }
-.icon { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; margin-bottom: 0.95rem; background: linear-gradient(180deg, rgba(63, 176, 198, 0.22), rgba(63, 176, 198, 0.06)); border: 1px solid rgba(63, 176, 198, 0.3); color: var(--teal-200); }
-.icon svg { width: 22px; height: 22px; }
 
 .steps { counter-reset: step; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.1rem; }
 @media (max-width: 900px) { .steps { grid-template-columns: 1fr 1fr; } }
@@ -377,9 +374,6 @@ th.us { color: var(--teal-200); }
 .faq details[open] summary::after { transform: rotate(45deg); }
 .faq details p { color: var(--muted); margin: 0 0 1.1rem; }
 
-.cta { text-align: center; padding: clamp(2.5rem, 6vw, 4rem); border-radius: 28px; border: 1px solid rgba(63, 176, 198, 0.3); background: radial-gradient(100% 140% at 50% 0%, rgba(36, 147, 171, 0.3), transparent 60%), var(--surface); }
-.cta p { color: var(--muted); max-width: 36rem; margin-inline: auto; }
-.cta .btn-row { justify-content: center; margin-top: 1.6rem; }
 
 .stat-row { display: flex; flex-wrap: wrap; gap: 2.5rem; margin-top: 2.2rem; }
 .stat b { display: block; font-size: 1.8rem; font-weight: 800; letter-spacing: -0.03em; }

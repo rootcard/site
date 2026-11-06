@@ -82,12 +82,12 @@
           <table>
             <thead><tr><th>Data</th><th>Who can read it</th><th>How long</th></tr></thead>
             <tbody>
-              <tr><td>Public log (your signed events, handle, home)</td><td>Anyone</td><td>While the identity is homed or registered here</td></tr>
-              <tr><td>Public profile</td><td>Anyone</td><td>Until you change it</td></tr>
-              <tr><td>Vault and private data</td><td>Only you: encrypted in your browser with your password</td><td>Until you change it</td></tr>
+              <tr><td>Public log (your signed events, handle, home)</td><td>Anyone</td><td>Kept: it is public, and other services check proofs against it</td></tr>
+              <tr><td>Public profile</td><td>Anyone</td><td>The newest version you published</td></tr>
+              <tr><td>Vault and private data</td><td>Only you: encrypted in your browser with your password</td><td>The newest copy you saved; after a password reset or a move this home stops serving it</td></tr>
               <tr><td>Sessions after sign-in</td><td>This server</td><td>Deleted after 24 hours unused, or at logout</td></tr>
               <tr><td>Sign-in challenges</td><td>This server</td><td>Single use, valid 60 seconds</td></tr>
-              <tr><td>Network addresses</td><td>This server, in memory</td><td>Only for the rate limits, at most an hour; never written to the database</td></tr>
+              <tr><td>Network addresses</td><td>This server, in memory</td><td>Only for the rate limits, at most two hours; never written to the database</td></tr>
             </tbody>
           </table>
         </div>
