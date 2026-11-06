@@ -24,6 +24,7 @@ unchanged, integrity checked against the registry). The server never sees a pass
 | `/card?h=Name%23TAG` | Public lookup: resolves a handle and verifies log and profile in the browser |
 | `/keytool` | Explains the key tool and offers the npm package's `keytool.html` as a **download only** (never rendered from this origin), with its SHA-256. The site never asks for a recovery key ([PWR-6]) |
 | `/developers` | Integration guide and this home's API |
+| `/policy` | Operator (`Hexagon#DNTT`), the live host key from `/v0/host`, what is stored and for how long, how to leave |
 
 Every page is served with a strict CSP (`script-src 'self'`, no inline script or style, nothing third-party), `nosniff`,
 `no-referrer`, `frame-ancestors 'none'` and HSTS on https.
