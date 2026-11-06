@@ -479,3 +479,35 @@ a.feature { color: inherit; display: block; } a.feature:hover { text-decoration:
 .btn svg { flex: none; }
 .page-head .status-note { margin: 1.2rem 0 0; }
 .proof-statement { white-space: pre-wrap; word-break: break-word; font-size: 0.9rem; max-height: 14rem; overflow: auto; }
+
+/* ---------- card page: proof disclosure, log ---------- */
+
+.disclosure > summary, .more > summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 1rem; font-weight: 650; }
+.disclosure > summary::-webkit-details-marker, .more > summary::-webkit-details-marker { display: none; }
+.disclosure > summary::after, .more > summary::after { content: "+"; color: var(--teal-300); font-size: 1.3rem; line-height: 1; transition: transform 0.2s; }
+.disclosure[open] > summary::after, .more[open] > summary::after { transform: rotate(45deg); }
+.disclosure > summary { color: var(--muted); }
+.disclosure[open] > summary { color: var(--text); margin-bottom: 1rem; }
+.more { margin-bottom: 0.4rem; }
+.more > summary { font-size: 0.92rem; color: var(--muted); margin-bottom: 0.8rem; }
+.more > summary::after { font-size: 1.1rem; }
+
+.log { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.8rem; }
+.log li { border-left: 2px solid var(--line-2); padding: 0.1rem 0 0.1rem 0.9rem; }
+.log li.current { border-left-color: var(--teal-300); }
+.log-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 0.7rem; font-size: 0.95rem; }
+.log-head b { font-weight: 650; }
+.log-head .faint { font-size: 0.85rem; }
+.log-detail { margin: 0.25rem 0 0; font-size: 0.85rem; color: var(--muted); word-break: break-all; }
+.log-detail .mono { font-size: 0.82rem; }
+
+/* On narrow screens the card comes right after the lookup, so its stamp is seen without scrolling to the bottom. */
+@media (max-width: 920px) {
+  .card-page > div { display: contents; }
+  .card-page > div > .panel + .panel { margin-top: 0; }
+  .card-page #lookupForm { order: 0; }
+  .card-page > aside { order: 1; }
+  .card-page #result { order: 2; }
+  .card-page #proofBox { order: 3; }
+  .card-page:not(.has-result) > aside { display: none; }
+}

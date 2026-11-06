@@ -3,6 +3,7 @@
 //   Proof:  take the proof (and the log and statement sent with it), merge that log with the one at this home ([VER-4]),
 //           verify the proof against the newest ([PRF-4]) and stamp the result on the card.
 // A proof link (`/card#proof=<base64url>`) carries the proof in the fragment, which is never sent to the server.
+// A pasted proof is checked as it changes: there is no button to press.
 
 import { HOME, REALM, busy, explain, groups, http, instanceTime, now, rc, renderCard, status, tilt } from "/js/common.js";
 
@@ -13,6 +14,8 @@ card.classList.add("placeholder");
 tilt(card);
 
 const ACCOUNT = /^[0-9A-Z]{52}$/;
+let proofRun = 0; // the newest proof check; older ones leave the page alone
+let proofTimer;
 
 function fact(dl, k, v, mono, note) {
   const dt = document.createElement("dt");
@@ -51,6 +54,69 @@ function hostOf(url) {
   } catch {
     return url;
   }
+}
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+const REASON = {
+  register: "first registration",
+  revoke: "account key replaced",
+  restore: "restored with the recovery key",
+  fresh: "moved or started afresh",
+};
+
+function when(t) {
+  return Number.isInteger(t) && t > 0 ? new Date(t * 1000).toISOString().slice(0, 16).replace("T", " ") + " UTC" : "";
+}
+
+function keyLine(label, key) {
+  const p = el("p", "log-detail");
+  p.append(document.createTextNode(`${label}: `), el("span", "mono", key));
+  return p;
+}
+
+/** Every event of a verified log, oldest first, with the current instance and the newest version marked. */
+function renderLog(log, state) {
+  const ol = $("rLog");
+  ol.replaceChildren();
+  log.forEach((e, i) => {
+    const item = el("li");
+    const head = el("div", "log-head");
+    const body = e?.body ?? {};
+    const sigs = Array.isArray(e?.sigs) ? e.sigs.length : 0;
+    const details = [];
+    let title;
+    if (e.kind === "incept") {
+      title = "Created";
+      details.push(el("p", "log-detail", `Handle ${body.username} in realm ${body.realm}. The account id is the hash of this event.`));
+      details.push(keyLine("Recovery public key", body.recovery));
+    } else if (e.kind === "instance") {
+      title = "Account key and home";
+      details.push(el("p", "log-detail", `${REASON[body.reason] ?? body.reason}; home ${hostOf(body.home?.url)}.`));
+      details.push(keyLine("Account key", body.account_key));
+    } else if (e.kind === "rotate_recovery") {
+      title = "Recovery key replaced";
+      details.push(keyLine("New recovery public key", body.recovery));
+    } else if (e.kind === "retire") {
+      title = "Retired";
+      details.push(el("p", "log-detail", "The owner ended this identity. Nothing can follow this event."));
+    } else title = String(e.kind);
+    head.append(el("span", "faint mono", `#${i}`), el("b", "", title));
+    if (when(e.time)) head.append(el("span", "faint", when(e.time)));
+    const tags = [];
+    if (state.instance && state.instance.seq === i) tags.push("current instance");
+    if (state.version.seq === i) tags.push("newest");
+    if (tags.length) head.append(el("span", "badge ok", tags.join(" · ")));
+    if (state.instance && state.instance.seq === i) item.className = "current";
+    item.append(head, ...details);
+    item.append(el("p", "log-detail faint", `${sigs} signature${sigs === 1 ? "" : "s"}, verified.`));
+    ol.append(item);
+  });
 }
 
 async function resolve(q) {
@@ -164,8 +230,10 @@ async function show(log, state, proof) {
   if (profileOk) checks.append(li("The public profile is signed by the current account key."));
   for (const c of proof?.checks ?? []) checks.append(li(c));
   checks.append(li("Anything the profile or a statement says was written by the identity's owner, not checked by anyone."));
+  renderLog(log, state);
   showProof(proof);
   $("result").hidden = false;
+  $("grid").classList.add("has-result");
 }
 
 function showProof(proof) {
@@ -179,6 +247,9 @@ function showProof(proof) {
 
 async function lookup(q) {
   const st = $("lookupStatus");
+  proofRun++; // a proof still being checked must not replace this lookup
+  clearTimeout(proofTimer);
+  status($("proofStatus"), "", "");
   status(st, "busy", "Fetching and verifying…");
   $("result").hidden = true;
   try {
@@ -190,7 +261,6 @@ async function lookup(q) {
     if (state.account !== account) throw new rc.RootcardError("account_mismatch");
     await show(log, state, null);
     status(st, "", "");
-    status($("proofStatus"), "", "");
     history.replaceState(null, "", `/card?h=${encodeURIComponent(state.handle)}`);
   } catch (e) {
     if (e.code === "ambiguous_handle" && Array.isArray(e.body?.candidates)) {
@@ -310,23 +380,40 @@ async function checkProof(bundleText, challengeText, recipientText) {
   return { log, state, proof: { stamp, summary, note, facts, checks } };
 }
 
+/** Check the pasted proof; only the newest run may touch the page, so typing never shows a stale result. */
 async function verifyProofForm() {
+  const run = ++proofRun;
   const st = $("proofStatus");
+  if (!$("proofText").value.trim()) {
+    status(st, "", "");
+    return;
+  }
   status(st, "busy", "Fetching the log and verifying…");
-  $("result").hidden = true;
   try {
     await rc.checkSupport();
     const r = await checkProof($("proofText").value, $("proofChallenge").value, $("proofRecipient").value);
+    if (run !== proofRun) return;
     await show(r.log, r.state, r.proof);
+    if (run !== proofRun) return;
     status($("lookupStatus"), "", "");
-    status(st, "", "");
-    $("result").scrollIntoView({ behavior: "smooth", block: "start" });
+    // The same summary as on the result, next to the field, for when the card is out of view.
+    const level = r.proof.stamp.level;
+    status(st, level === "bad" ? "error" : level === "info" ? "ok" : level, r.proof.summary);
+    $("q").value = r.state.handle;
   } catch (e) {
+    if (run !== proofRun) return;
+    $("result").hidden = true;
     renderCard(card, { username: "?", realm: REALM, proof: { level: "bad", title: "Not verified", detail: e.code ?? "" } });
     card.classList.add("placeholder");
+    $("grid").classList.add("has-result");
     $("cardNote").textContent = "No identity could be verified for this proof.";
     status(st, "error", explain(e));
   }
+}
+
+function verifySoon(delay = 350) {
+  clearTimeout(proofTimer);
+  proofTimer = setTimeout(() => verifyProofForm(), delay);
 }
 
 /** Fill the proof form from `#proof=<base64url of { proof, log?, statement? }>` (a link from the account page). */
@@ -339,8 +426,10 @@ function fromFragment() {
     $("proofText").value = text;
     $("proofChallenge").value = b.hasStatement ? JSON.stringify(b.statement) : "";
     $("proofRecipient").value = "";
+    $("proofBox").open = true;
     return true;
   } catch {
+    $("proofBox").open = true;
     status($("proofStatus"), "error", "The proof link is damaged.");
     return false;
   }
@@ -352,17 +441,20 @@ $("lookupForm").addEventListener("submit", (e) => {
 });
 $("proofForm").addEventListener("submit", (e) => {
   e.preventDefault();
-  busy($("proofForm"), verifyProofForm);
+  verifyProofForm();
 });
-$("proofText").addEventListener("change", () => {
-  // Offer the statement that came with a pasted proof, unless the verifier typed one.
+$("proofText").addEventListener("input", () => {
+  // Use the statement that came with a pasted proof, unless the verifier typed one.
   try {
     const b = parseBundle($("proofText").value);
     if (b.hasStatement && !$("proofChallenge").value.trim()) $("proofChallenge").value = JSON.stringify(b.statement);
   } catch {}
+  verifySoon();
 });
+$("proofChallenge").addEventListener("input", () => verifySoon());
+$("proofRecipient").addEventListener("input", () => verifySoon());
 
-if (fromFragment()) busy($("proofForm"), verifyProofForm);
+if (fromFragment()) verifyProofForm();
 else {
   const h = new URLSearchParams(location.search).get("h");
   if (h) {
