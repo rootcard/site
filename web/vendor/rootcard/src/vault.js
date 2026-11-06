@@ -7,7 +7,7 @@
 import { fail } from "./errors.js";
 import { base64urlDecode, base64urlEncode, concat, utf8 } from "./encoding.js";
 import {
-  aesGcmDecrypt, aesGcmEncrypt, ed25519Public, ed25519Sign, frameObject, hkdf, sha256, x25519, x25519Public,
+  aesGcmDecrypt, aesGcmEncrypt, DRAW_ATTEMPTS, ed25519Public, ed25519PublicIs, ed25519Sign, frameObject, hkdf, sha256, usableSeed, x25519, x25519Public,
 } from "./crypto.js";
 import { argon2id } from "./argon2.js";
 import { canonical, parseLimited } from "./json.js";
@@ -136,9 +136,13 @@ export async function unlockVault(vault, state, secret) {
   const contents = checkContents(parseLimited(pt, CONTENTS_LIMIT));
   pt.fill(0);
   if (!state.instance) fail("no_instance");
-  if (formatKey("ed25519", await ed25519Public(contents.accountSeed)) !== state.instance.account_key) {
+  if (!(await ed25519PublicIs(contents.accountSeed, s.parseKey(state.instance.account_key, "ed25519")))) {
     fail("wrong_account_key");
   }
+  // Check the signing seed of the lock against its key on record, so that a platform that cannot import it signs
+  // with it anyway ([IMP-6]); a mismatch is not this function's to judge (a login with it fails at the host).
+  const signKey = lockId === "recovery" ? state.recovery : lock.value.auth;
+  await ed25519PublicIs(lockSeed, s.parseKey(signKey, "ed25519"));
   return { vaultKey: vk, contents, lock: lockId, lockSeed, info };
 }
 
@@ -167,13 +171,29 @@ function kdfValue(kdf, salt) {
   return { alg: "argon2id", m: kdf.m, t: kdf.t, p: kdf.p, salt: base64urlEncode(salt) };
 }
 
-/** Create a new password lock's public part. Draws: slot id (8), salt (16). Returns `[slot, lockPublic]`. */
+/** A new salt and its lock secrets, drawn again while the auth seed is unusable ([CRY-9]). → bad_key (broken generator) */
+async function newLockSecrets(account, lock, password, kdf, random) {
+  for (let i = 0; i < DRAW_ATTEMPTS; i++) {
+    const salt = random(16);
+    const ls = await deriveLockSecrets(account, lock, password, kdf, salt);
+    if (usableSeed(ls.authSeed)) return [salt, ls];
+    ls.authSeed.fill(0);
+    ls.boxSecret.fill(0);
+  }
+  fail("bad_key");
+}
+
+/**
+ * Create a new password lock's public part. `slot` is `{ label, password, username, kdf }`; the password must satisfy
+ * [LCK-8] for `username` (`weak_password`), as in every function that creates a password lock. Draws: slot id (8),
+ * salt (16, again while the auth seed is unusable, [CRY-9]). Returns `[slot, lockPublic]`.
+ */
 export async function newPasswordLock(account, slot, random) {
+  checkPassword(slot.password, slot.username);
   checkLabel(slot.label);
   const id = base64urlEncode(random(8));
-  const salt = random(16);
   const kdf = { m: slot.kdf.m, t: slot.kdf.t, p: slot.kdf.p ?? 1 };
-  const ls = await deriveLockSecrets(account, id, slot.password, kdf, salt);
+  const [salt, ls] = await newLockSecrets(account, id, slot.password, kdf, random);
   const pub = {
     id,
     kdf: kdfValue(kdf, salt),
@@ -244,16 +264,17 @@ export async function updateContents(u, vault, contents, random) {
 }
 
 /**
- * A password change ([CHG-1] step 1). Draws: salt (16), wrap (32 + 12), contents nonce (12).
+ * A password change ([CHG-1] step 1); the new password must satisfy [LCK-8] for `username` (`weak_password`).
+ * Draws: salt (16), wrap (32 + 12), contents nonce (12).
  * Returns `{ vault, new }` where `new` is `SHA-256(canonical(new lock))`.
  */
-export async function changePassword(u, vault, slot, password, kdf, random) {
+export async function changePassword(u, vault, slot, password, username, kdf, random) {
+  checkPassword(password, username);
   const { account, instance, grant } = idsOf(u, vault);
   const index = u.info.locks.findIndex((l) => l.kind === "password" && l.id === slot);
   if (index < 0) fail("bad_locks");
-  const salt = random(16);
   const k = { m: kdf.m, t: kdf.t, p: kdf.p ?? 1 };
-  const ls = await deriveLockSecrets(account, slot, password, k, salt);
+  const [salt, ls] = await newLockSecrets(account, slot, password, k, random);
   const box = await x25519Public(ls.boxSecret);
   const pub = { id: slot, kdf: kdfValue(k, salt), auth: formatKey("ed25519", await ed25519Public(ls.authSeed)), box: formatKey("x25519", box) };
   ls.authSeed.fill(0);

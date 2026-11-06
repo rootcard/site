@@ -107,11 +107,11 @@ rootcard = { version = <span class="s">"{{rootcard_version}}"</span>, default-fe
           you send the registration, then erase it. Never ask for the recovery key in an application client.</p></div>
       </div>
       <pre><span class="k">import</span> { register } <span class="k">from</span> <span class="s">"rootcard/vault"</span>;
-<span class="k">import</span> { systemRandom, KDF_DEFAULT } <span class="k">from</span> <span class="s">"rootcard"</span>;
+<span class="k">import</span> { systemRandom, newRecoveryKey, KDF_DEFAULT } <span class="k">from</span> <span class="s">"rootcard"</span>;
 
 <span class="k">const</span> base = <span class="s">"https://rootcard.org"</span>;
 <span class="k">const</span> d = <span class="k">await</span> (<span class="k">await</span> fetch(`${base}/v0/host`)).json();
-<span class="k">const</span> rk = systemRandom(32);
+<span class="k">const</span> rk = <span class="k">await</span> newRecoveryKey(<span class="s">"global"</span>, <span class="s">"Astra"</span>, systemRandom);
 <span class="k">const</span> reg = <span class="k">await</span> register(rk, <span class="s">"global"</span>, <span class="s">"Astra"</span>, password,
   <span class="s">"Password"</span>, { key: d.key, url: base },
   Math.floor(Date.now() / 1000), KDF_DEFAULT, systemRandom);
@@ -155,7 +155,7 @@ rk.fill(0);
       </div>
       <p></p>
       <p class="muted">Errors are JSON objects with the specification's codes (<code>{ "error": "not_home", … }</code>).
-        CORS is open and no endpoint uses cookies. Full details: <a href="https://github.com/Hexagon/rootcard/blob/main/docs/HOST_PROTOCOL.md">HOST_PROTOCOL.md</a>.</p>
+        CORS is open and no endpoint uses cookies. Full details: <a href="https://github.com/rootcard/rootcard/blob/main/docs/HOST_PROTOCOL.md">HOST_PROTOCOL.md</a>.</p>
     </div>
   </section>
 
@@ -178,11 +178,11 @@ rk.fill(0);
       </div>
       <p></p>
       <div class="btn-row">
-        <a class="btn" href="https://github.com/Hexagon/rootcard/blob/main/spec/SPEC.md">Specification</a>
-        <a class="btn" href="https://github.com/Hexagon/rootcard/blob/main/docs/CONCEPTS.md">Concepts</a>
-        <a class="btn" href="https://github.com/Hexagon/rootcard/blob/main/docs/THREAT_MODEL.md">Threat model</a>
-        <a class="btn" href="https://github.com/Hexagon/rootcard/blob/main/docs/ARCHITECTURE.md">Architecture</a>
-        <a class="btn btn-primary" href="https://github.com/Hexagon/rootcard">rootcard on GitHub</a>
+        <a class="btn" href="https://github.com/rootcard/rootcard/blob/main/spec/SPEC.md">Specification</a>
+        <a class="btn" href="https://github.com/rootcard/rootcard/blob/main/docs/CONCEPTS.md">Concepts</a>
+        <a class="btn" href="https://github.com/rootcard/rootcard/blob/main/docs/THREAT_MODEL.md">Threat model</a>
+        <a class="btn" href="https://github.com/rootcard/rootcard/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+        <a class="btn btn-primary" href="https://github.com/rootcard/rootcard">rootcard on GitHub</a>
         <a class="btn btn-ghost" href="https://github.com/rootcard/site">This site's source</a>
       </div>
     </div>

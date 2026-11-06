@@ -15,6 +15,11 @@ export function isVersionSegment(segment) {
   return /^[vV][0-9]+$/.test(segment);
 }
 
+// A base URL path segment ([HST-22]): non-empty, only unreserved characters (no percent-encoding), not a dot segment.
+function isPathSegment(segment) {
+  return /^[A-Za-z0-9\-._~]+$/.test(segment) && segment !== "." && segment !== "..";
+}
+
 function authorityHost(rest) {
   const authority = rest.split("/")[0];
   if (authority.startsWith("[")) {
@@ -26,8 +31,8 @@ function authorityHost(rest) {
 
 /**
  * Check a base URL ([HST-22]): `https://` and a host, an optional port and an optional path without a trailing slash,
- * query, fragment or user info; plain `http://` only for `localhost`, `127.0.0.1` and `[::1]`; and its last path
- * segment is not an API version segment. → `bad_field`
+ * query, fragment or user info; plain `http://` only for `localhost`, `127.0.0.1` and `[::1]`; path segments of
+ * unreserved characters only, never `.` or `..`; and its last path segment is not an API version segment. → `bad_field`
  */
 export function checkBaseUrl(url) {
   checkUrl(url);
@@ -43,7 +48,7 @@ export function checkBaseUrl(url) {
   if (authorityHost(authority) === "" || !/^[A-Za-z0-9.\-:[\]]+$/.test(authority)) fail("bad_field");
   if (slash >= 0) {
     const segments = rest.slice(slash + 1).split("/");
-    if (segments.some((x) => x === "")) fail("bad_field");
+    if (!segments.every(isPathSegment)) fail("bad_field");
     if (isVersionSegment(segments[segments.length - 1])) fail("bad_field");
   }
 }

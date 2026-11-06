@@ -3,114 +3,386 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https: http://127.0.0.1:* http://localhost:*; img-src data:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https: http://127.0.0.1:* http://localhost:* http://[::1]:*; img-src data:; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="dark">
 <title>rootcard key tool</title>
 <style>
-  :root { --bg: #fbfaf7; --fg: #1d1d1b; --muted: #6b6a66; --line: #dcd9d2; --accent: #2d5b8a; --warn: #8a3b2d; --panel: #fff; }
-  @media (prefers-color-scheme: dark) { :root { --bg: #161615; --fg: #ecebe7; --muted: #a3a19b; --line: #3a3936; --accent: #8db6e0; --warn: #e09a8d; --panel: #1f1f1d; } }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; }
-  main { max-width: 880px; margin: 0 auto; padding: 24px 16px 64px; }
-  h1 { font-size: 22px; margin: 0 0 4px; }
-  h2 { font-size: 16px; margin: 0 0 12px; }
-  p.lead { color: var(--muted); margin: 0 0 20px; }
-  .warn { border-left: 3px solid var(--warn); padding: 8px 12px; margin: 0 0 20px; background: var(--panel); }
-  section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin: 0 0 16px; }
-  label { display: block; font-size: 13px; color: var(--muted); margin: 8px 0 2px; }
-  input, textarea, select { width: 100%; font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
-  textarea { min-height: 64px; font-family: ui-monospace, monospace; font-size: 13px; }
-  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0 12px; }
-  button { font: inherit; padding: 6px 14px; margin: 12px 8px 0 0; border: 1px solid var(--accent); border-radius: 6px; background: transparent; color: var(--accent); cursor: pointer; }
-  button.danger { border-color: var(--warn); color: var(--warn); }
-  button:disabled { opacity: .4; cursor: default; }
-  pre { white-space: pre-wrap; word-break: break-all; font: 13px/1.45 ui-monospace, monospace; margin: 0; }
-  #status { min-height: 1.5em; }
-  .ok { color: var(--accent); } .err { color: var(--warn); }
-  details > summary { cursor: pointer; font-weight: 600; }
+  /* The theme of rootcard.org: the logo's teal tile and white chip on a deep night background. Everything is inline:
+     the page works from file:// and loads nothing. */
+  :root {
+    --bg: #0a0f14; --bg-2: #0d141b; --surface: #111a23; --surface-2: #16212c; --line: #1f2c39; --line-2: #2a3a4a;
+    --text: #e7eef4; --muted: #94a5b6; --faint: #66788a;
+    --teal-700: #136579; --teal-600: #1a7a91; --teal-500: #2493ab; --teal-400: #3fb0c6; --teal-300: #6fd0df; --teal-200: #a6e6ee;
+    --ok: #4ed39a; --warn: #f2b25c; --danger: #ff7a6b;
+    --radius: 14px; --radius-lg: 22px;
+    --shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 20px 50px -20px rgba(0, 0, 0, 0.6);
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; font: 16px/1.6 var(--sans); color: var(--text); min-height: 100vh;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(36, 147, 171, 0.18), transparent 60%),
+      radial-gradient(900px 500px at -10% 10%, rgba(19, 101, 121, 0.16), transparent 60%),
+      var(--bg);
+    background-attachment: fixed;
+  }
+  ::selection { background: rgba(63, 176, 198, 0.35); }
+  a { color: var(--teal-300); }
+  code, .mono { font-family: var(--mono); font-size: 0.92em; }
+  :not(pre) > code { background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 0.08em 0.4em; }
+  h1, h2, h3 { line-height: 1.15; margin: 0 0 0.5em; letter-spacing: -0.02em; }
+  h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 800; }
+  h2 { font-size: 1.35rem; }
+  h3 { font-size: 1.1rem; }
+  p { margin: 0 0 1em; }
+  [hidden] { display: none !important; }
+  .wrap { width: min(980px, 100% - 2.5rem); margin-inline: auto; }
+  .muted { color: var(--muted); }
+
+  .topbar { border-bottom: 1px solid rgba(255, 255, 255, 0.06); background: rgba(10, 15, 20, 0.72); }
+  .topbar-inner { display: flex; align-items: center; justify-content: space-between; height: 62px; gap: 1rem; }
+  .brand { display: inline-flex; align-items: center; gap: 0.6rem; }
+  .brand svg { width: 34px; height: 34px; border-radius: 9px; box-shadow: 0 6px 18px -6px rgba(36, 147, 171, 0.7); }
+  .wordmark { font-weight: 800; font-size: 1.22rem; letter-spacing: -0.03em; }
+  .wordmark b { color: var(--teal-300); }
+
+  .page-head { padding: clamp(2rem, 5vw, 3.2rem) 0 1.4rem; }
+  .page-head p { color: var(--muted); font-size: 1.08rem; max-width: 46rem; }
+  .eyebrow { display: inline-block; font-size: 0.8rem; font-weight: 750; letter-spacing: 0.14em; text-transform: uppercase; color: var(--teal-300); margin-bottom: 0.8rem; }
+
+  .panel {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0)), var(--surface);
+    border: 1px solid var(--line); border-radius: var(--radius-lg); padding: clamp(1.2rem, 3vw, 1.9rem); box-shadow: var(--shadow);
+    margin-bottom: 1.25rem;
+  }
+  .step-no { font-family: var(--mono); font-size: 0.85rem; font-weight: 700; color: var(--teal-300); margin-right: 0.5rem; }
+
+  .btn {
+    --b: var(--line-2); display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+    font: inherit; font-weight: 650; font-size: 1rem; line-height: 1; padding: 0.85rem 1.3rem; border-radius: 12px;
+    border: 1px solid var(--b); background: var(--surface-2); color: var(--text); cursor: pointer; white-space: nowrap;
+    transition: transform 0.12s ease, background 0.2s, border-color 0.2s;
+  }
+  .btn:hover { border-color: var(--teal-500); transform: translateY(-1px); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .btn-primary {
+    --b: transparent; background: linear-gradient(180deg, var(--teal-500), var(--teal-700)); color: #fff;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 10px 28px -10px rgba(36, 147, 171, 0.9);
+  }
+  .btn-primary:hover { background: linear-gradient(180deg, #2aa2bb, var(--teal-600)); border-color: transparent; }
+  .btn-danger { --b: rgba(255, 122, 107, 0.4); color: var(--danger); background: transparent; }
+  .btn-row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; margin-top: 0.4rem; }
+
+  label, .label { display: block; font-weight: 600; font-size: 0.93rem; margin-bottom: 0.4rem; }
+  .opt { color: var(--faint); font-weight: 500; }
+  .field { margin-bottom: 1.1rem; }
+  .hint { display: block; color: var(--faint); font-size: 0.85rem; font-weight: 400; margin-top: 0.35rem; }
+  .hint.good { color: var(--ok); }
+  .hint.bad { color: var(--danger); }
+  input:not([type="file"]):not([type="radio"]), textarea, select {
+    width: 100%; font: inherit; color: var(--text); background: var(--bg-2); border: 1px solid var(--line-2);
+    border-radius: 11px; padding: 0.75rem 0.95rem; outline: none; transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  input[type="file"] {
+    width: 100%; font: inherit; font-size: 0.93rem; color: var(--muted); background: var(--bg-2);
+    border: 1px dashed var(--line-2); border-radius: 11px; padding: 0.6rem;
+  }
+  input[type="file"]::file-selector-button {
+    font: inherit; font-weight: 650; color: var(--text); background: var(--surface-2); border: 1px solid var(--line-2);
+    border-radius: 9px; padding: 0.45rem 0.9rem; margin-right: 0.8rem; cursor: pointer;
+  }
+  textarea { font-family: var(--mono); font-size: 0.86rem; min-height: 6rem; resize: vertical; }
+  input:focus, textarea:focus, select:focus { border-color: var(--teal-400); box-shadow: 0 0 0 4px rgba(63, 176, 198, 0.16); }
+  input[aria-invalid="true"] { border-color: var(--danger); }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 1rem; }
+
+  .choice { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.2rem; }
+  @media (max-width: 640px) { .choice { grid-template-columns: 1fr; } }
+  .choice label { display: flex; gap: 0.7rem; align-items: flex-start; padding: 0.9rem 1rem; border: 1px solid var(--line-2); border-radius: 13px; background: var(--bg-2); cursor: pointer; margin: 0; }
+  .choice label:has(input:checked) { border-color: var(--teal-400); background: rgba(63, 176, 198, 0.08); }
+  .choice input { accent-color: var(--teal-500); margin-top: 0.3rem; flex: none; }
+  .choice span { display: block; font-weight: 400; color: var(--muted); font-size: 0.88rem; }
+
+  details.more { margin: -0.3rem 0 1.1rem; }
+  details.more > summary { cursor: pointer; color: var(--teal-300); font-size: 0.93rem; font-weight: 600; }
+  details.more[open] > summary { margin-bottom: 0.8rem; }
+
+  .tabs { display: flex; gap: 0.3rem; border-bottom: 1px solid var(--line); margin: -0.4rem 0 1.4rem; overflow-x: auto; }
+  .tabs button { font: inherit; font-weight: 600; font-size: 0.97rem; background: none; border: 0; color: var(--muted); padding: 0.7rem 0.9rem; border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; }
+  .tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--teal-400); }
+  .tabs button:hover { color: var(--text); }
+
+  .notice { display: flex; gap: 0.8rem; padding: 0.9rem 1.1rem; border-radius: 13px; border: 1px solid var(--line-2); background: var(--surface-2); font-size: 0.95rem; margin-bottom: 1.1rem; }
+  .notice::before { content: "i"; flex: none; width: 1.4rem; height: 1.4rem; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 0.8rem; background: var(--teal-700); color: #fff; margin-top: 0.1rem; }
+  .notice.warn { border-color: rgba(242, 178, 92, 0.35); background: rgba(242, 178, 92, 0.07); }
+  .notice.warn::before { content: "!"; background: #9a6420; }
+  .notice.error { border-color: rgba(255, 122, 107, 0.4); background: rgba(255, 122, 107, 0.08); }
+  .notice.error::before { content: "×"; background: #a33b2f; }
+  .notice.ok { border-color: rgba(78, 211, 154, 0.35); background: rgba(78, 211, 154, 0.07); }
+  .notice.ok::before { content: "✓"; background: #1f7d55; }
+  .notice p:last-child { margin: 0; }
+
+  .badge { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.74rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 0.25rem 0.6rem; border-radius: 999px; border: 1px solid var(--line-2); color: var(--muted); background: var(--surface-2); white-space: nowrap; }
+  .badge.ok { color: var(--ok); border-color: rgba(78, 211, 154, 0.35); background: rgba(78, 211, 154, 0.08); }
+  .badge.teal { color: var(--teal-200); border-color: rgba(63, 176, 198, 0.4); background: rgba(63, 176, 198, 0.1); }
+  .badge.warn { color: var(--warn); border-color: rgba(242, 178, 92, 0.35); background: rgba(242, 178, 92, 0.08); }
+  .badge.bad { color: var(--danger); border-color: rgba(255, 122, 107, 0.4); background: rgba(255, 122, 107, 0.08); }
+  .badge .dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: currentColor; }
+  .badges { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+
+  /* The identity, drawn as the card on rootcard.org. */
+  .summary { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 1.5rem; align-items: center; margin-bottom: 1.4rem; }
+  @media (max-width: 760px) { .summary { grid-template-columns: 1fr; } }
+  .idcard {
+    --c1: #1f8ea6; --c2: #0d4c5e; aspect-ratio: 85.6 / 54; border-radius: 18px; padding: 7% 7.5%; color: #fff;
+    container-type: inline-size; overflow: hidden; display: grid; grid-template-rows: auto 1fr auto;
+    background:
+      radial-gradient(120% 90% at 0% 0%, rgba(255, 255, 255, 0.22), transparent 55%),
+      repeating-radial-gradient(circle at 115% 120%, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 9px),
+      linear-gradient(135deg, var(--c1), var(--c2));
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14) inset, 0 1px 0 rgba(255, 255, 255, 0.35) inset, 0 30px 60px -30px rgba(0, 0, 0, 0.85);
+  }
+  .idcard.local { --c1: #2c3440; --c2: #11161d; }
+  .idcard.retired { filter: grayscale(0.9) brightness(0.7); }
+  .ic-top { display: flex; justify-content: space-between; align-items: center; font-size: 4.4cqi; font-weight: 800; }
+  .ic-kind { font-size: 0.7em; font-weight: 750; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.85; }
+  .idcard.local .ic-kind { color: var(--warn); }
+  .ic-mid { display: flex; align-items: center; gap: 6cqi; }
+  .ic-chip { width: 17cqi; flex: none; }
+  .ic-label { font-size: 2.8cqi; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.7; font-weight: 700; }
+  .ic-handle { font-size: 7.4cqi; font-weight: 800; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ic-handle .tag { color: var(--teal-200); font-weight: 700; }
+  .idcard.local .ic-handle .tag { color: var(--warn); }
+  .ic-id { font-family: var(--mono); font-size: 3cqi; letter-spacing: 0.04em; opacity: 0.9; word-break: break-all; }
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 0.45rem 1.1rem; font-size: 0.93rem; margin: 0 0 1rem; }
+  .kv dt { color: var(--faint); }
+  .kv dd { margin: 0; word-break: break-all; }
+
+  /* Actions: tiles to choose from, then the chosen action's form. */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.7rem; margin-bottom: 1.3rem; }
+  .tile { text-align: left; font: inherit; color: var(--text); background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 0.9rem 1rem; cursor: pointer; display: flex; flex-direction: column; gap: 0.45rem; transition: border-color 0.15s, transform 0.15s; }
+  .tile:hover { border-color: var(--line-2); transform: translateY(-1px); }
+  .tile[aria-pressed="true"] { border-color: var(--teal-400); background: rgba(63, 176, 198, 0.08); }
+  .tile.unavailable { opacity: 0.55; }
+  .tile b { font-size: 0.98rem; }
+  .tile small { color: var(--muted); font-size: 0.85rem; line-height: 1.4; }
+  .tile.danger b { color: var(--danger); }
+  .tile .req { align-self: flex-start; margin-top: auto; font-size: 0.68rem; padding: 0.15rem 0.5rem; }
+  .opform { border-top: 1px solid var(--line); padding-top: 1.3rem; }
+  .opform h3 { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+
+  .result-head { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.9rem; }
+  .result-head h2 { margin: 0; }
+  #status { font-weight: 700; }
+  #status.ok { color: var(--ok); }
+  #status.err { color: var(--danger); }
+  #status.busy { color: var(--teal-300); }
+  pre {
+    margin: 0; background: #070b0f; border: 1px solid var(--line); border-radius: 13px; padding: 1rem 1.15rem;
+    white-space: pre-wrap; word-break: break-all; font: 0.86rem/1.6 var(--mono); color: #cfe3ea; min-height: 3.2rem;
+  }
+  .foot { color: var(--faint); font-size: 0.85rem; padding: 0.5rem 0 3rem; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
 </style>
 </head>
 <body>
-<main>
-  <h1>rootcard key tool</h1>
-  <p class="lead">The tool for everything that needs your recovery card: moving an identity, resetting or adding a password, rotating the recovery key and closing the identity. It runs entirely in this page and talks only to the hosts you enter.</p>
-  <div class="warn">Only enter your recovery key in the rootcard key tool, never in an application. Save this page and open it from your own disk.</div>
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <span class="brand">
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <defs>
+          <linearGradient id="lt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2493ab"/><stop offset="1" stop-color="#0d4c5e"/></linearGradient>
+          <linearGradient id="lc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d7eef3"/></linearGradient>
+          <mask id="lm">
+            <rect x="13" y="17" width="38" height="30" rx="7.5" fill="#fff"/>
+            <g stroke="#000" stroke-width="2.6" fill="none"><path d="M25.5 15V38.3M12 27H25.5M12 37H25.5"/><path d="M38.5 49V25.7M52 37H38.5M52 27H38.5"/></g>
+          </mask>
+        </defs>
+        <rect width="64" height="64" rx="15" fill="url(#lt)"/>
+        <rect x="13" y="17" width="38" height="30" rx="7.5" fill="url(#lc)" mask="url(#lm)"/>
+      </svg>
+      <span class="wordmark">root<b>card</b></span>
+    </span>
+    <span class="badge teal">Key tool <span id="version"></span></span>
+  </div>
+</header>
 
-  <section>
-    <h2>Your identity</h2>
-    <label for="cardFile">Recovery card (file)</label>
-    <input id="cardFile" type="file" accept=".json,application/json">
-    <details><summary>or type the card</summary>
-      <div class="row">
-        <div><label for="realm">Realm</label><input id="realm" value="global" autocomplete="off"></div>
-        <div><label for="username">Username</label><input id="username" autocomplete="off"></div>
-      </div>
-      <label for="rkey">Recovery key (RCR-…)</label><input id="rkey" autocomplete="off" spellcheck="false">
-    </details>
-    <label for="accountFile">Account file (optional)</label>
-    <input id="accountFile" type="file" accept=".json,application/json">
-    <label for="hosts">Hosts to ask for the newest version (comma separated base URLs, optional)</label>
-    <input id="hosts" placeholder="https://id.example.com" autocomplete="off">
-    <button id="load">Load identity</button>
-    <pre id="identity"></pre>
-  </section>
+<main class="wrap">
+  <div class="page-head">
+    <span class="eyebrow">Key tool</span>
+    <h1>Everything that needs your recovery card.</h1>
+    <p>Create an identity, put it on a host or move it, reset or add a password, rotate the recovery key, or close the
+      identity. The page runs entirely in your browser. It contacts no one until you enter a host address, and then only
+      that host.</p>
+    <div class="notice warn"><p>Only enter your recovery key here, never in an application or a website. Save this page
+      and open it from your own disk.</p></div>
+  </div>
 
-  <section id="actions" hidden>
-    <h2>Actions</h2>
-    <div class="row">
-      <div><label for="newPassword">New password (for restore with a new host, fresh, reset, add)</label><input id="newPassword" type="password" autocomplete="new-password"></div>
-      <div><label for="label">Label of the new password</label><input id="label" value="Password"></div>
+  <section class="panel">
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" id="tab-open" aria-selected="true" aria-controls="pane-open">Open my identity</button>
+      <button type="button" role="tab" id="tab-create" aria-selected="false" aria-controls="pane-create">Create a new identity</button>
+      <button type="button" role="tab" id="tab-verify" aria-selected="false" aria-controls="pane-verify">Verify a proof</button>
     </div>
-    <label for="targetHost">Host for a new instance (restore, fresh)</label>
-    <input id="targetHost" placeholder="https://id.example.com" autocomplete="off">
-    <button data-op="restore">Restore at host</button>
-    <button data-op="fresh">Fresh instance at host</button>
-    <button data-op="reset">Reset forgotten password</button>
-    <button data-op="add">Add password</button>
-    <label for="slot">Password to revoke</label><select id="slot"></select>
-    <button data-op="revoke" class="danger">Revoke password</button>
-    <button data-op="rotate">Rotate recovery key</button>
-    <button data-op="card">Print card</button>
-    <label for="retireConfirm">To close the identity forever, type its username</label>
-    <input id="retireConfirm" autocomplete="off">
-    <button data-op="retire" class="danger">Retire identity</button>
-    <details><summary>Root proof</summary>
-      <label for="proofStatement">Statement (JSON) or challenge (64 hex)</label><input id="proofStatement" value='"I own this identity"'>
-      <label for="proofRecipient">Recipient</label><input id="proofRecipient">
-      <button data-op="prove">Make root proof</button>
-    </details>
-  </section>
 
-  <section>
-    <details><summary>Create a new identity</summary>
-      <div class="row">
-        <div><label for="nRealm">Realm</label><input id="nRealm" value="global"></div>
-        <div><label for="nUser">Username</label><input id="nUser"></div>
+    <div id="pane-open" role="tabpanel">
+      <div class="field">
+        <label for="cardFile">Recovery card</label>
+        <input id="cardFile" type="file" accept=".json,application/json">
+        <span class="hint">The <code>.card.json</code> file you saved when the identity was created.</span>
       </div>
-      <label for="nHost">Host (optional: without one, the identity has no instance until you restore or start fresh)</label>
-      <input id="nHost" placeholder="https://id.example.com">
-      <label for="nPassword">Password</label><input id="nPassword" type="password" autocomplete="new-password">
-      <button id="create">Create</button>
-    </details>
+      <details class="more"><summary>No file? Type the card instead</summary>
+        <div class="row">
+          <div class="field"><label for="realm">Realm</label><input id="realm" value="global" autocomplete="off" spellcheck="false"></div>
+          <div class="field"><label for="username">Username</label><input id="username" autocomplete="off" spellcheck="false"></div>
+        </div>
+        <div class="field"><label for="rkey">Recovery key</label><input id="rkey" autocomplete="off" spellcheck="false" placeholder="RCR-…"></div>
+      </details>
+      <div class="field">
+        <label for="accountFile">Account file <span class="opt">(optional)</span></label>
+        <input id="accountFile" type="file" accept=".json,application/json">
+        <span class="hint">An <code>.account.json</code> export. It holds the newest log and a copy of your vault, so the
+          tool can work from it even when the host cannot be reached.</span>
+      </div>
+      <div class="field">
+        <label for="hosts">Host address <span class="opt">(optional)</span></label>
+        <input id="hosts" data-host="list" placeholder="https://id.example.com" autocomplete="off" spellcheck="false">
+        <span class="hint" id="hostsCheck">The address of the server where you use the identity. A card alone does not
+          know where the identity lives, so enter the host here or load the account file. Leave it empty to work only
+          with the files.</span>
+      </div>
+      <div class="btn-row"><button type="button" class="btn btn-primary" id="load">Open identity</button></div>
+    </div>
+
+    <div id="pane-create" role="tabpanel" hidden>
+      <p class="muted">A new recovery key is generated in this page. The card is downloaded before anything is sent.
+        Keep it offline: it is the only way to recover the identity.</p>
+      <div class="label">Where should the identity live?</div>
+      <div class="choice">
+        <label><input type="radio" name="nWhere" id="nAtHost" value="host" checked>
+          <div>At a host<span>Registered right away, with a password to sign in with in applications.</span></div></label>
+        <label><input type="radio" name="nWhere" id="nLocal" value="local">
+          <div>Only on this computer<span>A card and an account file, nothing sent. Put it on a host later with
+            "Start at a host".</span></div></label>
+      </div>
+      <div class="row">
+        <div class="field"><label for="nRealm">Realm</label><input id="nRealm" value="global" autocomplete="off" spellcheck="false">
+          <span class="hint">The namespace the identity belongs to. Keep <code>global</code> unless an application says otherwise.</span></div>
+        <div class="field"><label for="nUser">Username</label><input id="nUser" autocomplete="off" spellcheck="false"></div>
+      </div>
+      <div data-when="host">
+        <div class="field"><label for="nHost">Host address</label>
+          <input id="nHost" data-host="one" placeholder="https://id.example.com" autocomplete="off" spellcheck="false">
+          <span class="hint" id="nHostCheck">The server that will store the identity, for example the one an application told you to use.</span></div>
+        <div class="field"><label for="nPassword">Password</label><input id="nPassword" type="password" autocomplete="new-password">
+          <span class="hint">At least 12 characters, not the username. You sign in with it; the recovery card stays offline.</span></div>
+      </div>
+      <div class="btn-row"><button type="button" class="btn btn-primary" id="create">Create identity</button></div>
+    </div>
+
+    <div id="pane-verify" role="tabpanel" hidden>
+      <p class="muted">Check a proof that someone made with their identity. Works offline.</p>
+      <div class="field"><label for="vLog">Account file or log (JSON)</label><textarea id="vLog" spellcheck="false"></textarea></div>
+      <div class="field"><label for="vProof">Proof (JSON)</label><textarea id="vProof" spellcheck="false"></textarea></div>
+      <div class="row">
+        <div class="field"><label for="vStatement">Statement (JSON) or challenge (64 hex)</label><input id="vStatement" spellcheck="false"></div>
+        <div class="field"><label for="vRecipient">Recipient</label><input id="vRecipient" spellcheck="false"></div>
+      </div>
+      <div class="btn-row"><button type="button" class="btn btn-primary" id="verify">Verify</button></div>
+    </div>
   </section>
 
-  <section>
-    <details><summary>Verify a proof</summary>
-      <label for="vLog">Account file or log (JSON)</label><textarea id="vLog"></textarea>
-      <label for="vProof">Proof (JSON)</label><textarea id="vProof"></textarea>
-      <label for="vStatement">Statement (JSON) or challenge (64 hex)</label><input id="vStatement">
-      <label for="vRecipient">Recipient</label><input id="vRecipient">
-      <button id="verify">Verify</button>
-    </details>
+  <section class="panel" id="actions" hidden>
+    <h2>Your identity</h2>
+    <div class="summary">
+      <div class="idcard" id="idcard">
+        <div class="ic-top"><span>root<b>card</b></span><span class="ic-kind" id="icKind"></span></div>
+        <div class="ic-mid">
+          <svg class="ic-chip" viewBox="13 17 38 30" aria-hidden="true">
+            <defs>
+              <linearGradient id="cg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6fbfc"/><stop offset="0.5" stop-color="#cfe6ec"/><stop offset="1" stop-color="#a9cdd6"/></linearGradient>
+              <mask id="cm">
+                <rect x="13" y="17" width="38" height="30" rx="7.5" fill="#fff"/>
+                <g stroke="#000" stroke-width="2.2" fill="none"><path d="M25.5 15V38.1M12 27H25.5M12 37H25.5"/><path d="M38.5 49V25.9M52 37H38.5M52 27H38.5"/></g>
+              </mask>
+            </defs>
+            <rect x="13" y="17" width="38" height="30" rx="7.5" fill="url(#cg)" mask="url(#cm)"/>
+          </svg>
+          <div style="min-width: 0"><div class="ic-label">Handle</div><div class="ic-handle" id="icHandle"></div></div>
+        </div>
+        <div class="ic-id" id="icAccount"></div>
+      </div>
+      <div>
+        <div class="badges" id="badges"></div>
+        <p></p>
+        <dl class="kv" id="facts"></dl>
+      </div>
+    </div>
+    <div class="notice" id="modeNote"></div>
+
+    <h3>What do you want to do?</h3>
+    <div class="tiles" id="tiles">
+      <button type="button" class="tile" data-pick="fresh"><b>Start at a host</b><small>Put the identity on a host with a new, empty account and a password.</small></button>
+      <button type="button" class="tile" data-pick="restore"><b>Move to another host</b><small>Carry data, profile and passwords to a host, or restore after a host is gone.</small></button>
+      <button type="button" class="tile" data-pick="reset"><b>Reset forgotten password</b><small>One new password; every old password and session stops working.</small></button>
+      <button type="button" class="tile" data-pick="add"><b>Add a password</b><small>Another password, for example for a second device.</small></button>
+      <button type="button" class="tile" data-pick="revoke"><b>Revoke a password</b><small>Stop one password from working, for example after losing a device.</small></button>
+      <button type="button" class="tile" data-pick="rotate"><b>Rotate recovery key</b><small>Replace the recovery key. You get a new card; destroy the old one.</small></button>
+      <button type="button" class="tile" data-pick="card"><b>Show the card</b><small>The recovery card as text, to print or copy onto paper.</small></button>
+      <button type="button" class="tile" data-pick="prove"><b>Make a root proof</b><small>Sign a statement with the recovery key.</small></button>
+      <button type="button" class="tile danger" data-pick="retire"><b>Retire identity</b><small>Close the identity for good. It cannot be undone.</small></button>
+    </div>
+
+    <div class="opform" id="opform" hidden>
+      <h3><span id="opTitle"></span><span class="badge" id="opWhere"></span></h3>
+      <p class="muted" id="opText"></p>
+      <div class="notice warn" id="opBlocked" hidden></div>
+      <div class="field" data-for="fresh restore">
+        <label for="targetHost" id="targetHostLabel">Host address</label>
+        <input id="targetHost" data-host="one" placeholder="https://id.example.com" autocomplete="off" spellcheck="false">
+        <span class="hint" id="targetHostCheck">The server that will store the identity from now on.</span>
+      </div>
+      <div class="row" data-for="fresh reset add">
+        <div class="field"><label for="newPassword">New password</label><input id="newPassword" type="password" autocomplete="new-password">
+          <span class="hint">At least 12 characters, not the username.</span></div>
+        <div class="field"><label for="label">Name of the password</label><input id="label" value="Password">
+          <span class="hint">So you can tell your passwords apart, for example "Phone".</span></div>
+      </div>
+      <div class="field" data-for="revoke"><label for="slot">Password to revoke</label><select id="slot"></select></div>
+      <div data-for="prove">
+        <div class="field"><label for="proofStatement">Statement (JSON) or challenge (64 hex)</label><input id="proofStatement" value='"I own this identity"' spellcheck="false"></div>
+        <div class="field"><label for="proofRecipient">Recipient</label><input id="proofRecipient" spellcheck="false">
+          <span class="hint">Who the proof is for, as they asked for it.</span></div>
+      </div>
+      <div class="field" data-for="retire"><label for="retireConfirm">Type the username to confirm</label><input id="retireConfirm" autocomplete="off" spellcheck="false"></div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-primary" data-op="fresh" data-for="fresh">Start at this host</button>
+        <button type="button" class="btn btn-primary" data-op="restore" data-for="restore">Move to this host</button>
+        <button type="button" class="btn btn-primary" data-op="reset" data-for="reset">Reset password</button>
+        <button type="button" class="btn btn-primary" data-op="add" data-for="add">Add password</button>
+        <button type="button" class="btn btn-danger" data-op="revoke" data-for="revoke">Revoke password</button>
+        <button type="button" class="btn btn-primary" data-op="rotate" data-for="rotate">Rotate recovery key</button>
+        <button type="button" class="btn btn-primary" data-op="card" data-for="card">Show card</button>
+        <button type="button" class="btn btn-primary" data-op="prove" data-for="prove">Make root proof</button>
+        <button type="button" class="btn btn-danger" data-op="retire" data-for="retire">Retire identity</button>
+      </div>
+    </div>
   </section>
 
-  <section><h2>Result</h2><div id="status"></div><pre id="out"></pre></section>
-  <p class="lead">rootcard <span id="version"></span>. The format is specified in spec/SPEC.md of the rootcard repository.</p>
+  <section class="panel" id="result">
+    <div class="result-head"><h2>Result</h2><span id="status"></span></div>
+    <pre id="out">Nothing yet. Open your identity, create one or verify a proof.</pre>
+  </section>
+  <p class="foot">rootcard key tool. The format is specified in <code>spec/SPEC.md</code> of the rootcard repository.</p>
 </main>
 <script>
 "use strict";
 (() => {
-const ROOTCARD_VERSION = "0.2.1";
+const ROOTCARD_VERSION = "0.3.1";
 const __modules = {};
 __modules["errors.js"] = (() => {
 // Error codes (SPEC §20).
@@ -689,14 +961,76 @@ async function publicOf(prefix, alg, secret, usages) {
   return x;
 }
 
-/** The Ed25519 public key of a 32-byte seed ([CRY-2]). */
-async function ed25519Public(seed) {
-  return publicOf(ED_PKCS8, "Ed25519", seed, ["sign"]);
+/** How often a seed is drawn again before a generator is taken to be broken ([CRY-9]). */
+const DRAW_ATTEMPTS = 64;
+
+/** Whether an Ed25519 seed may be used for a new key: its first byte is not zero ([CRY-9]). */
+function usableSeed(seed) {
+  return seed[0] !== 0;
 }
 
-/** Import an Ed25519 seed as a non-extractable signing key ([IMP-2]). */
+// [IMP-6]: WebKit's WebCrypto rejects a pkcs8 Ed25519 seed whose first byte is zero, but signs with it when it is
+// imported as a JWK with its public key. Public keys of seeds checked against a key on record (ed25519PublicIs) are
+// kept here, keyed by the seed's buffer, so that later signatures with the same buffer can use that import. Nothing
+// here is secret, and nothing is added without the check.
+const CHECKED = new WeakMap();
+
+function b64u(bytes) {
+  let b = "";
+  for (const x of bytes) b += String.fromCharCode(x);
+  return btoa(b).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function importJwk(seed, publicKey, extractable) {
+  const jwk = { kty: "OKP", crv: "Ed25519", d: b64u(seed), x: b64u(publicKey), ext: extractable };
+  try {
+    return await subtle.importKey("jwk", jwk, { name: "Ed25519" }, extractable, ["sign"]);
+  } finally {
+    jwk.d = "";
+  }
+}
+
+/** The Ed25519 public key of a 32-byte seed ([CRY-2]). */
+async function ed25519Public(seed) {
+  try {
+    return await publicOf(ED_PKCS8, "Ed25519", seed, ["sign"]);
+  } catch (e) {
+    const known = CHECKED.get(seed);
+    if (known) return known.slice();
+    throw e;
+  }
+}
+
+/**
+ * Whether the Ed25519 public key of `seed` is `publicKey` (raw 32 bytes). Where the platform cannot import the seed
+ * ([IMP-6]), the import of the seed with `publicKey` answers it, since the platform rejects a public key that does
+ * not belong to the seed; the key is then remembered for signing with this seed buffer.
+ */
+async function ed25519PublicIs(seed, publicKey) {
+  let pub;
+  try {
+    pub = await publicOf(ED_PKCS8, "Ed25519", seed, ["sign"]);
+  } catch {
+    try {
+      await importJwk(seed, publicKey, false);
+    } catch {
+      return false;
+    }
+    CHECKED.set(seed, Uint8Array.from(publicKey));
+    return true;
+  }
+  return pub.length === publicKey.length && pub.every((b, i) => b === publicKey[i]);
+}
+
+/** Import an Ed25519 seed as a non-extractable signing key ([IMP-2], [IMP-6]). */
 async function ed25519SigningKey(seed) {
-  return importPrivate(ED_PKCS8, "Ed25519", seed, false, ["sign"]);
+  try {
+    return await importPrivate(ED_PKCS8, "Ed25519", seed, false, ["sign"]);
+  } catch (e) {
+    const known = CHECKED.get(seed);
+    if (known) return importJwk(seed, known, false);
+    throw e;
+  }
 }
 
 /** A deterministic Ed25519 signature ([CRY-8]). `key` is a seed or a key from ed25519SigningKey. */
@@ -761,20 +1095,41 @@ async function ed25519Verify(publicKey, m, sig) {
   if (!ok) fail("bad_signature");
 }
 
+// An X25519 secret as WebCrypto imports it. WebKit's WebCrypto on Linux rejects a secret whose first byte is zero
+// (DataError), probably because it handles the key as a big integer, so ~1 in 256 secrets failed there. X25519 clamps
+// every secret (RFC 7748 §5: the low 3 bits of the first byte cleared, the top bit of the last cleared and the next
+// set), so a zero first byte is given as 1 and a zero last byte as 0x40: the same scalar, the same keys and results.
+function x25519Secret(secret) {
+  const c = Uint8Array.from(secret);
+  if (c.length === 32) {
+    if (c[0] === 0) c[0] = 1;
+    if (c[31] === 0) c[31] = 0x40;
+  }
+  return c;
+}
+
 /** The X25519 public key of a 32-byte secret ([CRY-2]). */
 async function x25519Public(secret) {
-  return publicOf(X_PKCS8, "X25519", secret, ["deriveBits"]);
+  const c = x25519Secret(secret);
+  try {
+    return await publicOf(X_PKCS8, "X25519", c, ["deriveBits"]);
+  } finally {
+    c.fill(0);
+  }
 }
 
 /** X25519 key agreement; an all-zero result fails ([CRY-4]). → bad_key */
 async function x25519(secret, publicKey) {
   let bits;
+  const c = x25519Secret(secret);
   try {
-    const priv = await importPrivate(X_PKCS8, "X25519", secret, false, ["deriveBits"]);
+    const priv = await importPrivate(X_PKCS8, "X25519", c, false, ["deriveBits"]);
     const pub = await subtle.importKey("raw", publicKey, { name: "X25519" }, false, []);
     bits = new Uint8Array(await subtle.deriveBits({ name: "X25519", public: pub }, priv, 256));
   } catch {
     fail("bad_key");
+  } finally {
+    c.fill(0);
   }
   if (bits.every((b) => b === 0)) fail("bad_key");
   return bits;
@@ -796,7 +1151,7 @@ async function aesGcmDecrypt(key, nonce, ct, aad) {
   }
 }
 
-return { checkSupport, frame, frameObject, sha256, hkdf, ed25519Public, ed25519SigningKey, ed25519Sign, ed25519PointOk, ed25519Verify, x25519Public, x25519, aesGcmEncrypt, aesGcmDecrypt };
+return { checkSupport, frame, frameObject, sha256, hkdf, DRAW_ATTEMPTS, usableSeed, ed25519Public, ed25519PublicIs, ed25519SigningKey, ed25519Sign, ed25519PointOk, ed25519Verify, x25519Public, x25519, aesGcmEncrypt, aesGcmDecrypt };
 })();
 __modules["keys.js"] = (() => {
 // Keys in JSON (SPEC §3.3) and the schema helpers every structure uses ([CJ-11]–[CJ-13]).
@@ -1053,7 +1408,7 @@ __modules["log.js"] = (() => {
 
 const { fail } = __modules["errors.js"];
 const { base64urlEncode, base64urlDecode, bytesEqual } = __modules["encoding.js"];
-const { ed25519Public, ed25519Sign, ed25519Verify, frameObject, sha256 } = __modules["crypto.js"];
+const { ed25519Public, ed25519PublicIs, ed25519Sign, ed25519Verify, frameObject, sha256 } = __modules["crypto.js"];
 const { canonical, without, isObject, MAX_SAFE } = __modules["json.js"];
 const s = __modules["keys.js"];
 const { formatKey } = __modules["keys.js"];
@@ -1325,7 +1680,7 @@ async function addReceipt(e, hostSeed) {
 
 /** [RK-5] → wrong_recovery_key */
 async function checkRecoveryKey(state, seed) {
-  if (formatKey("ed25519", await ed25519Public(seed)) !== state.recovery) fail("wrong_recovery_key");
+  if (!(await ed25519PublicIs(seed, s.parseKey(state.recovery, "ed25519")))) fail("wrong_recovery_key");
 }
 
 /** A pending instance ([LOG-9]). `home` is `{ key: "ed25519:…", url }`. */
@@ -1385,6 +1740,11 @@ function isVersionSegment(segment) {
   return /^[vV][0-9]+$/.test(segment);
 }
 
+// A base URL path segment ([HST-22]): non-empty, only unreserved characters (no percent-encoding), not a dot segment.
+function isPathSegment(segment) {
+  return /^[A-Za-z0-9\-._~]+$/.test(segment) && segment !== "." && segment !== "..";
+}
+
 function authorityHost(rest) {
   const authority = rest.split("/")[0];
   if (authority.startsWith("[")) {
@@ -1396,8 +1756,8 @@ function authorityHost(rest) {
 
 /**
  * Check a base URL ([HST-22]): `https://` and a host, an optional port and an optional path without a trailing slash,
- * query, fragment or user info; plain `http://` only for `localhost`, `127.0.0.1` and `[::1]`; and its last path
- * segment is not an API version segment. → `bad_field`
+ * query, fragment or user info; plain `http://` only for `localhost`, `127.0.0.1` and `[::1]`; path segments of
+ * unreserved characters only, never `.` or `..`; and its last path segment is not an API version segment. → `bad_field`
  */
 function checkBaseUrl(url) {
   checkUrl(url);
@@ -1413,7 +1773,7 @@ function checkBaseUrl(url) {
   if (authorityHost(authority) === "" || !/^[A-Za-z0-9.\-:[\]]+$/.test(authority)) fail("bad_field");
   if (slash >= 0) {
     const segments = rest.slice(slash + 1).split("/");
-    if (segments.some((x) => x === "")) fail("bad_field");
+    if (!segments.every(isPathSegment)) fail("bad_field");
     if (isVersionSegment(segments[segments.length - 1])) fail("bad_field");
   }
 }
@@ -1425,7 +1785,7 @@ __modules["recovery.js"] = (() => {
 
 const { fail } = __modules["errors.js"];
 const { B32, base32Decode, base32Encode, base32Normalize, bytesEqual } = __modules["encoding.js"];
-const { ed25519Public, frame, frameObject, hkdf, sha256 } = __modules["crypto.js"];
+const { DRAW_ATTEMPTS, ed25519Public, frame, frameObject, hkdf, sha256, usableSeed } = __modules["crypto.js"];
 const { label } = __modules["labels.js"];
 
 async function checksum(key) {
@@ -1464,6 +1824,28 @@ async function deriveRecoveryKeys(rk, realm, username) {
   };
 }
 
+/**
+ * Generate a recovery key for an identity ([RK-3]): 32 random bytes, drawn again while the derived signing seed is
+ * unusable ([CRY-9]). Draws: 32 bytes per attempt. → bad_key only for a broken generator.
+ */
+async function newRecoveryKey(realm, username, random) {
+  for (let i = 0; i < DRAW_ATTEMPTS; i++) {
+    const rk = random(32);
+    const keys = await deriveRecoveryKeys(rk, realm, username);
+    const ok = usableSeed(keys.signSeed);
+    keys.signSeed.fill(0);
+    keys.boxSecret.fill(0);
+    if (ok) return rk;
+    rk.fill(0);
+  }
+  fail("bad_key");
+}
+
+/** A new recovery key must give a usable signing seed ([CRY-9]). → bad_key */
+function checkNewRecoveryKey(keys) {
+  if (!usableSeed(keys.signSeed)) fail("bad_key");
+}
+
 /** The public recovery signing key. */
 async function recoverySignPublic(keys) {
   return ed25519Public(keys.signSeed);
@@ -1471,7 +1853,7 @@ async function recoverySignPublic(keys) {
 
 
 
-return { bytesEqual, formatRecoveryKey, parseRecoveryKey, deriveRecoveryKeys, recoverySignPublic };
+return { bytesEqual, formatRecoveryKey, parseRecoveryKey, deriveRecoveryKeys, newRecoveryKey, checkNewRecoveryKey, recoverySignPublic };
 })();
 __modules["vaultcheck.js"] = (() => {
 // The vault's structure and signatures (SPEC §11), without any decryption: what hosts need ([VLT-3], [VLT-4]).
@@ -1841,7 +2223,7 @@ __modules["proof.js"] = (() => {
 
 const { fail } = __modules["errors.js"];
 const { base64urlEncode } = __modules["encoding.js"];
-const { ed25519Public, ed25519Sign, ed25519Verify, frameObject, sha256 } = __modules["crypto.js"];
+const { ed25519PublicIs, ed25519Sign, ed25519Verify, frameObject, sha256 } = __modules["crypto.js"];
 const { utf8 } = __modules["encoding.js"];
 const { validate, without } = __modules["json.js"];
 const s = __modules["keys.js"];
@@ -1863,11 +2245,10 @@ function checkRecipient(r) {
 /** Make a proof ([PRF-1], [PRF-2]). `by` is "account" or "recovery"; `challenge` is 32 bytes. */
 async function prove(state, by, seed, challenge, recipient) {
   checkRecipient(recipient);
-  const pub = formatKey("ed25519", await ed25519Public(seed));
   const p = { v: 1, by, account: state.account, challenge: base64urlEncode(challenge), recipient };
   if (by === "account") {
     if (!state.instance) fail("no_instance");
-    if (state.instance.account_key !== pub) fail("wrong_account_key");
+    if (!(await ed25519PublicIs(seed, s.parseKey(state.instance.account_key, "ed25519")))) fail("wrong_account_key");
     p.instance = state.instance.hash;
   } else {
     await checkRecoveryKey(state, seed);
@@ -2404,7 +2785,7 @@ __modules["vault.js"] = (() => {
 
 const { fail } = __modules["errors.js"];
 const { base64urlDecode, base64urlEncode, concat, utf8 } = __modules["encoding.js"];
-const { aesGcmDecrypt, aesGcmEncrypt, ed25519Public, ed25519Sign, frameObject, hkdf, sha256, x25519, x25519Public } = __modules["crypto.js"];
+const { aesGcmDecrypt, aesGcmEncrypt, DRAW_ATTEMPTS, ed25519Public, ed25519PublicIs, ed25519Sign, frameObject, hkdf, sha256, usableSeed, x25519, x25519Public } = __modules["crypto.js"];
 const { argon2id } = __modules["argon2.js"];
 const { canonical, parseLimited } = __modules["json.js"];
 const s = __modules["keys.js"];
@@ -2529,9 +2910,13 @@ async function unlockVault(vault, state, secret) {
   const contents = checkContents(parseLimited(pt, CONTENTS_LIMIT));
   pt.fill(0);
   if (!state.instance) fail("no_instance");
-  if (formatKey("ed25519", await ed25519Public(contents.accountSeed)) !== state.instance.account_key) {
+  if (!(await ed25519PublicIs(contents.accountSeed, s.parseKey(state.instance.account_key, "ed25519")))) {
     fail("wrong_account_key");
   }
+  // Check the signing seed of the lock against its key on record, so that a platform that cannot import it signs
+  // with it anyway ([IMP-6]); a mismatch is not this function's to judge (a login with it fails at the host).
+  const signKey = lockId === "recovery" ? state.recovery : lock.value.auth;
+  await ed25519PublicIs(lockSeed, s.parseKey(signKey, "ed25519"));
   return { vaultKey: vk, contents, lock: lockId, lockSeed, info };
 }
 
@@ -2560,13 +2945,29 @@ function kdfValue(kdf, salt) {
   return { alg: "argon2id", m: kdf.m, t: kdf.t, p: kdf.p, salt: base64urlEncode(salt) };
 }
 
-/** Create a new password lock's public part. Draws: slot id (8), salt (16). Returns `[slot, lockPublic]`. */
+/** A new salt and its lock secrets, drawn again while the auth seed is unusable ([CRY-9]). → bad_key (broken generator) */
+async function newLockSecrets(account, lock, password, kdf, random) {
+  for (let i = 0; i < DRAW_ATTEMPTS; i++) {
+    const salt = random(16);
+    const ls = await deriveLockSecrets(account, lock, password, kdf, salt);
+    if (usableSeed(ls.authSeed)) return [salt, ls];
+    ls.authSeed.fill(0);
+    ls.boxSecret.fill(0);
+  }
+  fail("bad_key");
+}
+
+/**
+ * Create a new password lock's public part. `slot` is `{ label, password, username, kdf }`; the password must satisfy
+ * [LCK-8] for `username` (`weak_password`), as in every function that creates a password lock. Draws: slot id (8),
+ * salt (16, again while the auth seed is unusable, [CRY-9]). Returns `[slot, lockPublic]`.
+ */
 async function newPasswordLock(account, slot, random) {
+  checkPassword(slot.password, slot.username);
   checkLabel(slot.label);
   const id = base64urlEncode(random(8));
-  const salt = random(16);
   const kdf = { m: slot.kdf.m, t: slot.kdf.t, p: slot.kdf.p ?? 1 };
-  const ls = await deriveLockSecrets(account, id, slot.password, kdf, salt);
+  const [salt, ls] = await newLockSecrets(account, id, slot.password, kdf, random);
   const pub = {
     id,
     kdf: kdfValue(kdf, salt),
@@ -2637,16 +3038,17 @@ async function updateContents(u, vault, contents, random) {
 }
 
 /**
- * A password change ([CHG-1] step 1). Draws: salt (16), wrap (32 + 12), contents nonce (12).
+ * A password change ([CHG-1] step 1); the new password must satisfy [LCK-8] for `username` (`weak_password`).
+ * Draws: salt (16), wrap (32 + 12), contents nonce (12).
  * Returns `{ vault, new }` where `new` is `SHA-256(canonical(new lock))`.
  */
-async function changePassword(u, vault, slot, password, kdf, random) {
+async function changePassword(u, vault, slot, password, username, kdf, random) {
+  checkPassword(password, username);
   const { account, instance, grant } = idsOf(u, vault);
   const index = u.info.locks.findIndex((l) => l.kind === "password" && l.id === slot);
   if (index < 0) fail("bad_locks");
-  const salt = random(16);
   const k = { m: kdf.m, t: kdf.t, p: kdf.p ?? 1 };
-  const ls = await deriveLockSecrets(account, slot, password, k, salt);
+  const [salt, ls] = await newLockSecrets(account, slot, password, k, random);
   const box = await x25519Public(ls.boxSecret);
   const pub = { id: slot, kdf: kdfValue(k, salt), auth: formatKey("ed25519", await ed25519Public(ls.authSeed)), box: formatKey("x25519", box) };
   ls.authSeed.fill(0);
@@ -2697,21 +3099,33 @@ const { base64urlEncode } = __modules["encoding.js"];
 const { inception } = __modules["id.js"];
 const { checkRecoveryKey, eventHash, pendingInstance, rotateRecoveryEvent, verifyLog } = __modules["log.js"];
 const { signPublic } = __modules["profile.js"];
-const { deriveRecoveryKeys } = __modules["recovery.js"];
+const { checkNewRecoveryKey, deriveRecoveryKeys } = __modules["recovery.js"];
+const { DRAW_ATTEMPTS, usableSeed } = __modules["crypto.js"];
 const { recoveryCard } = __modules["file.js"];
 const { carriedLocks, checkPassword, instanceVault, regrant } = __modules["vault.js"];
 
+/** The account seed of a new instance: 32 random bytes, drawn again while unusable ([CRY-9]). → bad_key (broken generator) */
+function drawAccountSeed(random) {
+  for (let i = 0; i < DRAW_ATTEMPTS; i++) {
+    const seed = random(32);
+    if (usableSeed(seed)) return seed;
+  }
+  fail("bad_key");
+}
+
 /**
- * Build a registration ([CLT-1]) from a recovery key the caller generated ([RK-3]). `home` is `{ key, url }` with
- * a key string. Draws: the account seed (32), then instanceVault with one new slot.
+ * Build a registration ([CLT-1]) from a recovery key the caller generated ([RK-3]; usable by [CRY-9], see
+ * newRecoveryKey → bad_key). `home` is `{ key, url }` with a key string. Draws: the account seed (32, again while
+ * unusable, [CRY-9]), then instanceVault with one new slot.
  * @returns {Promise<{ log, vault, public, card, account }>}
  */
 async function register(recoveryKey, realm, username, password, slotLabel, home, time, kdf, random) {
   checkPassword(password, username);
   const keys = await deriveRecoveryKeys(recoveryKey, realm, username);
+  checkNewRecoveryKey(keys);
   const inc = await inception(keys, realm, username);
   const state = await verifyLog([inc], { realms: [realm] });
-  const seed = random(32);
+  const seed = drawAccountSeed(random);
   const pending = await pendingInstance(state, keys.signSeed, seed, home, "register", time);
   const instance = base64urlEncode(await eventHash(pending));
   const vault = await instanceVault(
@@ -2721,7 +3135,7 @@ async function register(recoveryKey, realm, username, password, slotLabel, home,
       recovery: keys,
       contents: { accountSeed: seed, data: {} },
       keep: [],
-      add: { label: slotLabel, password, kdf },
+      add: { label: slotLabel, password, username, kdf },
     },
     random,
   );
@@ -2736,12 +3150,19 @@ async function register(recoveryKey, realm, username, password, slotLabel, home,
 /**
  * Build a new instance on top of `state` ([KT-3]). `mode` is `{ restore: true }`, `{ revoke: [slot ids] }`,
  * `{ reset: slot }` or `{ fresh: slot }`, where a slot is `{ label, password, kdf }`. `old` is the current vault
- * unlocked with the recovery lock (not needed for fresh). Draws: the account seed (32), then instanceVault.
+ * unlocked with the recovery lock (not needed for fresh). Draws: the account seed (32, again while unusable,
+ * [CRY-9]), then instanceVault.
  * @returns {Promise<{ event, vault, public }>}
  */
 async function newInstance(state, recovery, old, oldPublicData, mode, home, time, random) {
   await checkRecoveryKey(state, recovery.signSeed);
-  const seed = random(32);
+  const slot = mode.reset ?? mode.fresh;
+  if (slot) {
+    // The new password is checked before anything is drawn ([LCK-8]); its username must be this identity's.
+    if (slot.username !== state.username) fail("bad_field");
+    checkPassword(slot.password, state.username);
+  }
+  const seed = drawAccountSeed(random);
   const reason = mode.restore ? "restore" : mode.fresh ? "fresh" : "revoke";
   const event = await pendingInstance(state, recovery.signSeed, seed, home, reason, time);
   const instance = base64urlEncode(await eventHash(event));
@@ -2768,11 +3189,12 @@ async function newInstance(state, recovery, old, oldPublicData, mode, home, time
 }
 
 /**
- * Rotate the recovery key ([KT-5]) to `newKey`. `unlocked` is the current vault unlocked. Draws: regrant.
+ * Rotate the recovery key ([KT-5]) to `newKey` (usable by [CRY-9] → bad_key; see newRecoveryKey). `unlocked` is the current vault unlocked. Draws: regrant.
  * @returns {Promise<{ event, vault, card }>}
  */
 async function rotateRecovery(state, log, oldKeys, newKey, oldVault, unlocked, time, random) {
   const next = await deriveRecoveryKeys(newKey, state.realm, state.username);
+  checkNewRecoveryKey(next);
   const event = await rotateRecoveryEvent(state, oldKeys.signSeed, next.signSeed, time);
   const vault = await regrant(unlocked, oldVault, next, random);
   const card = await recoveryCard(state.realm, state.username, state.account, newKey, [...log, event]);
@@ -2838,6 +3260,11 @@ function show(text, ok = true) {
   $("out").textContent = text;
 }
 
+/** Show progress during an action: the status stays "Working…" until the action ends. */
+function progress(text) {
+  $("out").textContent = text;
+}
+
 function explain(e) {
   if (e instanceof rc.RootcardError) {
     const why = {
@@ -2856,8 +3283,9 @@ function explain(e) {
 
 async function run(f) {
   for (const b of document.querySelectorAll("button")) b.disabled = true;
-  $("status").className = "";
+  $("status").className = "busy";
   $("status").textContent = "Working…";
+  $("out").textContent = "";
   try {
     await rc.checkSupport();
     show(await f());
@@ -2865,6 +3293,8 @@ async function run(f) {
     show(explain(e), false);
   } finally {
     for (const b of document.querySelectorAll("button")) b.disabled = false;
+    render();
+    $("result").scrollIntoView({ block: "nearest" });
   }
 }
 
@@ -2884,17 +3314,33 @@ async function readFile(input) {
 }
 
 function checkUrl(url) {
-  if (!/^https:\/\//.test(url) && !/^http:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(url)) throw new Error(`${url}: hosts are reached over https`);
+  if (!/^https:\/\//.test(url) && !/^http:\/\/(127\.0\.0\.1|localhost|\[::1\])(:|\/|$)/.test(url)) throw new Error(`${url}: hosts are reached over https`);
   return url.replace(/\/+$/, "");
 }
 
-// A host address as the user typed it: trailing slashes removed, then checked as a base URL ([HST-22]).
-function checkHost(url) {
-  const base = url.replace(/\/+$/, "");
+const LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/;
+
+/**
+ * A host address as the user typed it, made into a base URL: surrounding space and trailing slashes removed, and
+ * `https://` added when no scheme is given (`http://` for this computer). The result is then checked ([HST-22]).
+ */
+function normalizeHost(text) {
+  let t = text.trim().replace(/\/+$/, "");
+  if (t && !/^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(t)) t = (LOCAL.test(t) ? "http://" : "https://") + t;
+  return t;
+}
+
+function checkHost(text) {
+  const base = normalizeHost(text);
+  if (!base) throw new Error("Enter a host address, such as https://id.example.com.");
   try {
     rc.checkBaseUrl(base);
   } catch {
-    throw new Error(`${url}: not a host base URL (https://host[:port][/path], without /v0 at the end)`);
+    let why = "use the form https://host, with an optional :port and /path";
+    if (/\/[vV][0-9]+$/.test(base)) why = `leave out the /${rc.API_VERSION} at the end: enter the address without it`;
+    else if (/^http:\/\//.test(base)) why = "hosts are reached over https:// (plain http:// only on this computer)";
+    else if (/[?#]/.test(base)) why = "leave out the ? or # part";
+    throw new Error(`"${text.trim()}" is not a host address: ${why}.`);
   }
   return base;
 }
@@ -2906,16 +3352,26 @@ function apiRoot(base) {
 }
 
 async function http(method, url, body) {
-  const res = await fetch(checkUrl(url), {
-    method,
-    headers: body === undefined ? {} : { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : rc.canonicalString(body),
-    credentials: "omit",
-    referrerPolicy: "no-referrer",
-    cache: "no-store",
-  });
+  let res;
+  try {
+    res = await fetch(checkUrl(url), {
+      method,
+      headers: body === undefined ? {} : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : rc.canonicalString(body),
+      credentials: "omit",
+      referrerPolicy: "no-referrer",
+      cache: "no-store",
+    });
+  } catch {
+    throw new Error(`${url}: the host could not be reached. Check the address and the network connection.`);
+  }
   const text = await res.text();
-  const value = text ? rc.parseJson(text) : true;
+  let value;
+  try {
+    value = text ? rc.parseJson(text) : true;
+  } catch {
+    throw new Error(`${url}: HTTP ${res.status}, and the answer is not a rootcard host's. Check the address.`);
+  }
   if (!res.ok) {
     const code = value?.error;
     if (code && rc.ERROR_CODES.includes(code)) throw new rc.RootcardError(code);
@@ -3012,8 +3468,9 @@ async function hostHome(base) {
 
 function newSlot() {
   const password = $("newPassword").value;
-  rc.checkPassword(password, current.state.username);
-  return { label: $("label").value.trim() || "Password", password, kdf: rc.KDF_DEFAULT };
+  const username = current.state.username;
+  rc.checkPassword(password, username);
+  return { label: $("label").value.trim() || "Password", password, username, kdf: rc.KDF_DEFAULT };
 }
 
 async function submitInstance(base, mode, old) {
@@ -3042,6 +3499,10 @@ async function submitInstance(base, mode, old) {
   current.state = state;
   current.vault = ni.vault;
   current.public = ni.public;
+  current.vaultError = undefined;
+  try {
+    refreshSlots(await rc.verifyVault(ni.vault, state));
+  } catch {}
   download(rc.accountFileName(state), rc.exportAccount(state, v.events, ni.public, ni.vault));
   return describe(state) + "\n\nThe new account file was downloaded." + note;
 }
@@ -3059,10 +3520,10 @@ async function challengeOf(text) {
 const ops = {
   async restore() {
     const { u } = await currentVault();
-    return submitInstance(checkHost($("targetHost").value.trim()), { restore: true }, u);
+    return submitInstance(checkHost($("targetHost").value), { restore: true }, u);
   },
   async fresh() {
-    return submitInstance(checkHost($("targetHost").value.trim()), { fresh: newSlot() }, undefined);
+    return submitInstance(checkHost($("targetHost").value), { fresh: newSlot() }, undefined);
   },
   async reset() {
     const { u } = await currentVault();
@@ -3085,14 +3546,14 @@ const ops = {
   },
   async rotate() {
     const { vault, u } = await currentVault();
-    const newKey = random(32);
+    const newKey = await rc.newRecoveryKey(current.state.realm, current.state.username, random);
     const r = await rc.rotateRecovery(current.state, current.log, current.keys, newKey, vault, u, now(), random);
     newKey.fill(0);
     // The new card is saved and shown before the rotation is sent: once the host has the event, the old key no longer
     // signs and the new card is the only copy of the new key ([KT-5]).
     download(`${current.state.username}-new.card.json`, r.card);
     const text = await rc.cardText(r.card);
-    show(text + "\nSending the rotation… Keep this card.", true);
+    progress(text + "\nSending the rotation… Keep this card.");
     try {
       await http("POST", `${apiRoot(current.state.instance.home.url)}/id/${current.state.account}/events`, { events: [r.event], vault: r.vault });
     } catch (e) {
@@ -3103,15 +3564,12 @@ const ops = {
       );
     }
     current = null;
-    $("actions").hidden = true;
-    return text + "\nThe new card was downloaded. Destroy the old card, then load the new one.";
+    return text + "\nThe new card was downloaded. Destroy the old card, then open the identity with the new one.";
   },
   async retire() {
     if ($("retireConfirm").value !== current.state.username) throw new Error("Type the username to confirm.");
     const ev = await rc.retireEvent(current.state, current.keys.signSeed, now());
-    const base = current.state.instance?.home.url ?? hostList()[0];
-    if (!base) throw new Error("Enter a host.");
-    await http("POST", `${apiRoot(base)}/id/${current.state.account}/events`, { events: [ev] });
+    await http("POST", `${apiRoot(current.state.instance.home.url)}/id/${current.state.account}/events`, { events: [ev] });
     return `${current.state.handle} is retired.`;
   },
   async card() {
@@ -3123,35 +3581,291 @@ const ops = {
   },
 };
 
+// ---- The page: what each action needs, and whether the loaded identity has it ----
+
+/** Where an action sends something: "target" (the host typed for it), "home" (the primary host) or nowhere. */
+const ACTIONS = {
+  fresh: {
+    title: "Start at a host",
+    where: "target",
+    text: "Puts the identity on a host with a new, empty account: a new vault with the password below, and an empty " +
+      "profile. Use it for an identity that only exists on its card, or to start over. Data in an earlier account is " +
+      "not carried over (use “Move to another host” for that).",
+    host: "Host to start at",
+  },
+  restore: {
+    title: "Move to another host",
+    where: "target",
+    text: "Makes a new account at the host you enter, carrying over data, profile and passwords from the current " +
+      "vault. Use it to move, or to restore after a host is gone. The host may also be the current one.",
+    host: "Host to move to",
+  },
+  reset: {
+    title: "Reset a forgotten password",
+    where: "home",
+    text: "Starts a new account at the same host with one new password. Data and profile carry over; every old " +
+      "password, vault copy and session stops working.",
+  },
+  add: { title: "Add a password", where: "home", text: "Adds another password to the vault. The others keep working." },
+  revoke: {
+    title: "Revoke a password",
+    where: "home",
+    text: "Starts a new account at the same host without the chosen password. The other passwords keep working, and " +
+      "sessions signed in with the revoked one end.",
+  },
+  rotate: {
+    title: "Rotate the recovery key",
+    where: "home",
+    text: "Replaces the recovery key. The new card is downloaded before anything is sent; keep it, and destroy the old " +
+      "card once the rotation is done.",
+  },
+  card: { title: "Show the card", where: null, text: "Shows the recovery card as text, to print or copy onto paper." },
+  prove: {
+    title: "Make a root proof",
+    where: null,
+    text: "Signs a statement with the recovery key, so that anyone with your log can check that it came from you.",
+  },
+  retire: {
+    title: "Retire the identity",
+    where: "home",
+    text: "Closes the identity for good: no host will accept anything for it again, and its handle stays taken. This " +
+      "cannot be undone.",
+  },
+};
+
+const NO_HOST =
+  "The identity is not at any host that this page knows of. If it is at one, enter that host's address under " +
+  "“Host address” above (or load the account file) and open the identity again. Otherwise start it at a host first.";
+
+/** Why `op` cannot be done for the loaded identity now, or undefined. */
+function blocked(op) {
+  const st = current.state;
+  if (st.retired) return op === "card" ? undefined : "The identity is retired. Nothing can change it any more.";
+  if (op === "fresh" || op === "card" || op === "prove") return undefined;
+  const home = st.instance?.home.url;
+  if (!home) return NO_HOST;
+  if (op === "retire") return undefined;
+  if (current.vaultError) {
+    return `This needs the vault, and it could not be opened: ${current.vaultError}. Load the account file, or check ` +
+      "that the host can be reached.";
+  }
+  return undefined;
+}
+
+let picked = null;
+
+function splitHandle(handle) {
+  const i = handle.lastIndexOf("#");
+  return i < 0 ? [handle, ""] : [handle.slice(0, i), handle.slice(i)];
+}
+
+function badge(text, kind) {
+  const b = document.createElement("span");
+  b.className = `badge ${kind}`;
+  const dot = document.createElement("span");
+  dot.className = "dot";
+  b.append(dot, text);
+  return b;
+}
+
+/** Draw the loaded identity and which actions it allows. */
+function render() {
+  $("actions").hidden = !current;
+  if (!current) return;
+  const st = current.state;
+  const home = st.retired ? undefined : st.instance?.home.url;
+
+  const [name, tag] = splitHandle(st.handle);
+  const h = $("icHandle");
+  const t = document.createElement("span");
+  t.className = "tag";
+  t.textContent = tag;
+  h.replaceChildren(name, t);
+  $("icAccount").textContent = st.account;
+  $("icKind").textContent = st.retired ? "Retired" : home ? "Identity" : "Card only";
+  $("idcard").className = `idcard${st.retired ? " retired" : home ? "" : " local"}`;
+
+  const badges = [];
+  if (st.retired) badges.push(badge("Retired", "bad"));
+  else if (home) badges.push(badge("At a host", "ok"));
+  else badges.push(badge("Not at any host", "warn"));
+  if (home) badges.push(current.vaultError ? badge("Vault not available", "warn") : badge("Vault open", "teal"));
+  $("badges").replaceChildren(...badges);
+
+  const facts = [
+    ["Realm", st.realm],
+    ["Host", home ?? (st.retired ? "none (retired)" : "none")],
+    ["Version", `seq ${st.version.seq}`],
+  ];
+  $("facts").replaceChildren(
+    ...facts.flatMap(([k, v]) => {
+      const dt = document.createElement("dt");
+      dt.textContent = k;
+      const dd = document.createElement("dd");
+      dd.textContent = v;
+      return [dt, dd];
+    }),
+  );
+
+  const note = $("modeNote");
+  if (st.retired) {
+    note.className = "notice error";
+    note.textContent = "This identity is retired. You can still show its card.";
+  } else if (!home) {
+    note.className = "notice warn";
+    note.textContent =
+      "This identity exists only on its card: no host stores it, so there is no account to sign in to yet. Choose " +
+      "“Start at a host” to put it on one. Showing the card and making root proofs work offline. If the identity " +
+      "already is at a host, enter that host's address above and open it again.";
+  } else if (current.vaultError) {
+    note.className = "notice warn";
+    note.textContent = `The identity is at ${home}, but its vault could not be opened (${current.vaultError}). ` +
+      "Actions that need the vault are unavailable; load the account file or try again when the host can be reached.";
+  } else {
+    note.className = "notice ok";
+    note.textContent = `The identity is at ${home}. Changes are sent there, and after each one that makes a new ` +
+      "account the new account file is downloaded.";
+  }
+
+  for (const tile of document.querySelectorAll("[data-pick]")) {
+    const why = blocked(tile.dataset.pick);
+    tile.classList.toggle("unavailable", Boolean(why));
+    let req = tile.querySelector(".req");
+    if (!req) {
+      req = document.createElement("span");
+      tile.append(req);
+    }
+    const where = ACTIONS[tile.dataset.pick].where;
+    req.className = `req badge ${why ? "warn" : where ? "teal" : "ok"}`;
+    req.textContent = why ? (where && !home ? "Needs a host" : "Unavailable") : where ? "Uses a host" : "Offline";
+    tile.setAttribute("aria-pressed", String(tile.dataset.pick === picked));
+  }
+  $("opform").hidden = !picked;
+  if (!picked) return;
+  const a = ACTIONS[picked];
+  const why = blocked(picked);
+  $("opTitle").textContent = a.title;
+  $("opText").textContent = a.text;
+  const where = $("opWhere");
+  if (a.where === "home") {
+    where.className = "badge teal";
+    where.textContent = home ? `Sends to ${home}` : "Needs a host";
+  } else if (a.where === "target") {
+    where.className = "badge teal";
+    where.textContent = "Sends to the host you enter";
+  } else {
+    where.className = "badge ok";
+    where.textContent = "Offline";
+  }
+  $("opBlocked").hidden = !why;
+  $("opBlocked").textContent = why ?? "";
+  if (a.host) $("targetHostLabel").textContent = a.host;
+  for (const el of document.querySelectorAll("#opform [data-for]")) {
+    el.hidden = !el.dataset.for.split(" ").includes(picked);
+  }
+  for (const b of document.querySelectorAll("#opform [data-op]")) b.disabled = Boolean(blocked(b.dataset.op));
+}
+
+/** Check a host address field while it is typed, and say what will be contacted. */
+function watchHost(input) {
+  const hint = $(`${input.id}Check`);
+  const idle = hint.textContent;
+  const check = () => {
+    const parts = input.dataset.host === "list" ? input.value.split(",") : [input.value];
+    const typed = parts.map((s) => s.trim()).filter(Boolean);
+    if (typed.length === 0) {
+      hint.className = "hint";
+      hint.textContent = idle;
+      input.removeAttribute("aria-invalid");
+      return;
+    }
+    try {
+      const bases = typed.map(checkHost);
+      hint.className = "hint good";
+      hint.textContent = `✓ Will contact ${bases.join(", ")}`;
+      input.removeAttribute("aria-invalid");
+    } catch (e) {
+      hint.className = "hint bad";
+      hint.textContent = explain(e);
+      input.setAttribute("aria-invalid", "true");
+    }
+  };
+  input.addEventListener("input", check);
+  check();
+}
+
+for (const input of document.querySelectorAll("[data-host]")) watchHost(input);
+
+for (const tab of document.querySelectorAll("[role=tab]")) {
+  tab.addEventListener("click", () => {
+    for (const t of document.querySelectorAll("[role=tab]")) {
+      const on = t === tab;
+      t.setAttribute("aria-selected", String(on));
+      $(t.getAttribute("aria-controls")).hidden = !on;
+    }
+  });
+}
+
+function createMode() {
+  return $("nLocal").checked ? "local" : "host";
+}
+for (const r of document.querySelectorAll("[name=nWhere]")) {
+  r.addEventListener("change", () => {
+    for (const el of document.querySelectorAll("[data-when]")) el.hidden = el.dataset.when !== createMode();
+  });
+}
+
+for (const tile of document.querySelectorAll("[data-pick]")) {
+  tile.addEventListener("click", () => {
+    picked = tile.dataset.pick;
+    render();
+    $("opform").scrollIntoView({ block: "nearest" });
+  });
+}
+
 $("version").textContent = ROOTCARD_VERSION;
 $("load").addEventListener("click", () =>
   run(async () => {
+    current = null;
+    picked = null;
     const notes = await gather();
-    $("actions").hidden = false;
     let extra = "";
-    try {
-      const { u } = await currentVault();
-      refreshSlots(u.info);
-    } catch (e) {
-      extra = `\n(Vault not available: ${explain(e)})`;
+    if (current.state.instance && !current.state.retired) {
+      try {
+        const { u } = await currentVault();
+        refreshSlots(u.info);
+      } catch (e) {
+        current.vaultError = explain(e);
+        extra = `\n(Vault not available: ${current.vaultError})`;
+      }
+    } else {
+      $("slot").replaceChildren();
     }
     return describe(current.state) + extra + (notes.length ? "\n\n" + notes.join("\n") : "");
   }),
 );
 for (const b of document.querySelectorAll("[data-op]")) {
-  b.addEventListener("click", () => run(() => (current ? ops[b.dataset.op]() : Promise.reject(new Error("Load the identity first.")))));
+  b.addEventListener("click", () =>
+    run(() => {
+      if (!current) throw new Error("Open the identity first.");
+      const why = blocked(b.dataset.op);
+      if (why) throw new Error(why);
+      return ops[b.dataset.op]();
+    }),
+  );
 }
 $("create").addEventListener("click", () =>
   run(async () => {
     const realm = $("nRealm").value.trim();
     const username = $("nUser").value.trim();
-    const rk = random(32);
-    const base = $("nHost").value.trim();
+    const base = createMode() === "host" ? checkHost($("nHost").value) : "";
+    if (base) rc.checkPassword($("nPassword").value, username);
+    const rk = await rc.newRecoveryKey(realm, username, random); // usable in every browser ([CRY-9])
     let card;
     let file;
     let state;
     if (base) {
-      const home = await hostHome(checkHost(base));
+      const home = await hostHome(base);
       const reg = await rc.register(rk, realm, username, $("nPassword").value, "Password", home, now(), rc.KDF_DEFAULT, random);
       rk.fill(0);
       // The card is saved before anything is sent: once the host has the identity, the card is the only copy of its
@@ -3172,7 +3886,12 @@ $("create").addEventListener("click", () =>
     rk.fill(0);
     if (!base) download(`${username}-${rc.tag(state.account)}.card.json`, card);
     download(rc.accountFileName(state), file);
-    return (await rc.cardText(card)) + "\n" + describe(state) + "\n\nThe card and the account file were downloaded. Keep the card offline.";
+    if (base) $("hosts").value = base;
+    $("hosts").dispatchEvent(new Event("input"));
+    const next = base
+      ? `To manage it, choose “Open my identity”, load the card (the host ${base} is already filled in).`
+      : "No host has it yet. To put it on one, choose “Open my identity”, load the card, then “Start at a host”.";
+    return (await rc.cardText(card)) + "\n" + describe(state) + "\n\nThe card and the account file were downloaded. Keep the card offline.\n" + next;
   }),
 );
 $("verify").addEventListener("click", () =>

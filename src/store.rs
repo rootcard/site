@@ -258,6 +258,18 @@ impl IdentityStore for Db {
         Ok(n == 1)
     }
 
+    fn handle_claimed(&self, key: &HandleKey) -> Result<bool, StoreError> {
+        let c = self.conn()?;
+        c.query_row(
+            "SELECT 1 FROM identities WHERE realm = ?1 AND username_lc = ?2 AND tag = ?3 AND claimed = 1",
+            params![key.realm, key.username, key.tag],
+            |_| Ok(true),
+        )
+        .optional()
+        .map_err(err)
+        .map(|r| r.unwrap_or(false))
+    }
+
     fn by_handle(&self, key: &HandleKey) -> Result<Vec<String>, StoreError> {
         let c = self.conn()?;
         let mut st = c

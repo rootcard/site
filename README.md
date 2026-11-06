@@ -1,6 +1,6 @@
 # rootcard.org
 
-The website of [rootcard](https://github.com/Hexagon/rootcard), and a public rootcard **home** for the `global` realm.
+The website of [rootcard](https://github.com/rootcard/rootcard), and a public rootcard **home** for the `global` realm.
 
 One Rust binary serves both:
 
@@ -9,7 +9,7 @@ One Rust binary serves both:
   `rootcard_host::http::route`, with SQLite storage and the recommended rate limits. Anyone can get an ID card with
   rootcard.org as home from the browser, without running a server or the CLI.
 
-The browser does all the cryptography with the published npm package (`web/vendor/rootcard`, `rootcard@0.2.1`
+The browser does all the cryptography with the published npm package (`web/vendor/rootcard`, `rootcard@0.3.1`
 unchanged, integrity checked against the registry). The server never sees a password or a recovery key.
 
 ## What the pages do
@@ -34,7 +34,7 @@ src/store.rs     SQLite IdentityStore / ChallengeStore / SessionStore (schema of
 src/limits.rs    rate limits of HOST_PROTOCOL.md §6, per address and per identity
 build.rs         embeds web/ into the binary (partials, version and key tool hash substituted, ETags)
 web/             pages, CSS, JS, logo; web/_partials are included into every page
-web/vendor/rootcard   the npm package rootcard@0.2.1 (src/, keytool.html, licenses)
+web/vendor/rootcard   the npm package rootcard@0.3.1 (src/, keytool.html, licenses)
 tests/browser    Playwright end-to-end test of the whole flow
 ```
 
@@ -72,8 +72,8 @@ node tests/browser/e2e.mjs
 
 Bump `rootcard` and `rootcard-host` in `Cargo.toml` and replace `web/vendor/rootcard` with the same version of the npm
 package (`npm pack rootcard@X.Y.Z`, check the integrity against `npm view rootcard@X.Y.Z dist.integrity`). The two must
-be the same release: the pages call the JS functions of that version (for example `changePassword` without a username in
-0.2.1).
+be the same release: the pages call the JS functions of that version (for example `changePassword` with a username and
+`newRecoveryKey` since 0.3.0).
 
 ## License
 

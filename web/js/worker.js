@@ -2,7 +2,7 @@
 // Everything that derives a password lock goes through this worker: registration, unlocking and password changes.
 
 import { register, changePassword, deriveLockSecrets } from "/vendor/rootcard/src/vault-index.js";
-import { accountId, deriveRecoveryKeys, inception, recoveryCard } from "/vendor/rootcard/src/index.js";
+import { accountId, deriveRecoveryKeys, inception, newRecoveryKey, recoveryCard } from "/vendor/rootcard/src/index.js";
 
 const random = (n) => crypto.getRandomValues(new Uint8Array(n));
 
@@ -19,7 +19,7 @@ function forget() {
 const ops = {
   async prepare(realm, username) {
     forget();
-    const rk = random(32);
+    const rk = await newRecoveryKey(realm, username, random);
     const keys = await deriveRecoveryKeys(rk, realm, username);
     const account = await accountId(await inception(keys, realm, username));
     keys.signSeed.fill(0);
@@ -38,9 +38,9 @@ const ops = {
   async derive(account, lock, password, kdf, salt) {
     return deriveLockSecrets(account, lock, password, kdf, salt);
   },
-  // The page checks the password rules ([LCK-8]) first: this version of changePassword does not take the username.
-  async changePassword(u, vault, slot, password, kdf) {
-    return changePassword(u, vault, slot, password, kdf, random);
+  // changePassword checks the password rules ([LCK-8]) against the username; the page checks them first too.
+  async changePassword(u, vault, slot, password, username, kdf) {
+    return changePassword(u, vault, slot, password, username, kdf, random);
   },
 };
 

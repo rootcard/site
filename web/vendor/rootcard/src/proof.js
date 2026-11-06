@@ -2,7 +2,7 @@
 
 import { fail } from "./errors.js";
 import { base64urlEncode } from "./encoding.js";
-import { ed25519Public, ed25519Sign, ed25519Verify, frameObject, sha256 } from "./crypto.js";
+import { ed25519PublicIs, ed25519Sign, ed25519Verify, frameObject, sha256 } from "./crypto.js";
 import { utf8 } from "./encoding.js";
 import { validate, without } from "./json.js";
 import * as s from "./keys.js";
@@ -24,11 +24,10 @@ function checkRecipient(r) {
 /** Make a proof ([PRF-1], [PRF-2]). `by` is "account" or "recovery"; `challenge` is 32 bytes. */
 export async function prove(state, by, seed, challenge, recipient) {
   checkRecipient(recipient);
-  const pub = formatKey("ed25519", await ed25519Public(seed));
   const p = { v: 1, by, account: state.account, challenge: base64urlEncode(challenge), recipient };
   if (by === "account") {
     if (!state.instance) fail("no_instance");
-    if (state.instance.account_key !== pub) fail("wrong_account_key");
+    if (!(await ed25519PublicIs(seed, s.parseKey(state.instance.account_key, "ed25519")))) fail("wrong_account_key");
     p.instance = state.instance.hash;
   } else {
     await checkRecoveryKey(state, seed);
