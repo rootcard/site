@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<title>Developers — rootcard</title>
+<title>Developers — rootcard.org</title>
 <meta name="description" content="Integrate rootcard: verify users with proofs, run your own host with rootcard-host, or build clients with the zero-dependency npm package. rootcard.org is a public home with an open API.">
 <!--#include head-->
 </head>
@@ -22,7 +22,7 @@
         with a fresh challenge and <code>verifyProof</code>. No central API.</p></a>
       <a class="feature" href="#host"><h3>Run your own host</h3><p>Give your service a standard username-and-password
         login with <code>rootcard-host</code>. No password hashes in your database.</p></a>
-      <a class="feature" href="#api"><h3>Use rootcard.org</h3><p>A public home for the <code>global</code> realm, with
+      <a class="feature" href="#api"><h3>Use rootcard.org</h3><p>One public home for the <code>global</code> realm, with
         the recommended HTTP binding and open CORS.</p></a>
     </div>
   </div>
@@ -129,8 +129,9 @@ rk.fill(0);
     <div class="wrap">
       <div class="section-head">
         <span class="eyebrow">rootcard.org as a home</span>
-        <h2>The public API</h2>
-        <p>rootcard.org serves the recommended HTTP binding for the <code>global</code> realm. Every endpoint below is
+        <h2>This home's API</h2>
+        <p>There is no central rootcard API: every home serves the same binding at its own base URL. rootcard.org serves
+          it for the <code>global</code> realm. Every endpoint below is
           under <code>https://rootcard.org/v0</code>. The base URL that goes into logs and signed messages is
           <code>https://rootcard.org</code>, without the version.</p>
       </div>

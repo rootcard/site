@@ -4,7 +4,8 @@ The website of [rootcard](https://github.com/rootcard/rootcard), and a public ro
 
 One Rust binary serves both:
 
-- **The product site**: what rootcard is, how it works, the comparison, the developer guide and the key tool download.
+- **The site of this home**: what rootcard.org is, what rootcard is and how it works, the comparison, the developer guide
+  and the key tool download. rootcard.org is one home among many, not a central rootcard server, and the pages say so.
 - **A home host**: the rootcard HTTP binding (`https://rootcard.org/v0/…`, rootcard's `docs/HOST_PROTOCOL.md`) through
   `rootcard_host::http::route`, with SQLite storage and the recommended rate limits. Anyone can get an ID card with
   rootcard.org as home from the browser, without running a server or the CLI.
@@ -16,12 +17,14 @@ unchanged, integrity checked against the registry). The server never sees a pass
 
 | Page | What |
 |---|---|
-| `/` | Product page |
+| `/` | Home page: what rootcard.org is (one home among many), getting started, questions |
+| `/rootcard` | About the rootcard standard: how it works, power levels, comparison |
 | `/create` | Registration ([CLT-1]): the recovery key is made in a Web Worker, the user must download or print the recovery card before anything is sent, then the registration is built (Argon2id off the main thread) and posted. The log is fetched back and verified |
 | `/account` | Sign-in ([LGN-1]: lookup, log, locks, fetch, local unlock, login), then the low-power functions: public profile, private data in the vault, password change ([CHG-1]), account file export, account proofs ([PRF-1]). The unlocked vault lives only in page memory; leaving the page logs the session out |
 | `/card?h=Name%23TAG` | Public lookup: resolves a handle and verifies log and profile in the browser |
 | `/keytool` | Explains the key tool and offers the npm package's `keytool.html` as a **download only** (never rendered from this origin), with its SHA-256. The site never asks for a recovery key ([PWR-6]) |
 | `/developers` | Integration guide and this home's API |
+| `/policy` | Operator (`Hexagon#DNTT`), the live host key from `/v0/host`, what is stored and for how long, how to leave |
 
 Every page is served with a strict CSP (`script-src 'self'`, no inline script or style, nothing third-party), `nosniff`,
 `no-referrer`, `frame-ancestors 'none'` and HSTS on https.

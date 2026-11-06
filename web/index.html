@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="en">
 <head>
-<title>rootcard — an ID card for online logins that you own</title>
-<meta name="description" content="rootcard is a portable, self-certifying identity: a username and password that no server can steal, reset or lock you out of, backed by a recovery card you keep. Create one with rootcard.org as its home.">
-<meta property="og:title" content="rootcard — an ID card for online logins that you own">
+<title>rootcard.org — a public home for rootcard identities</title>
+<meta name="description" content="rootcard.org is a public home for rootcard identities. rootcard is an open standard for logins you own: a username and password that no server can steal, reset or lock you out of, backed by a recovery card you keep.">
+<meta property="og:title" content="rootcard.org — a public home for rootcard identities">
 <meta property="og:description" content="Servers can check that you are you, but they can never become you, never learn your password, and never keep you from moving.">
 <meta property="og:type" content="website">
 <!--#include head-->
@@ -15,20 +15,19 @@
 <section class="hero">
   <div class="wrap hero-grid">
     <div>
-      <span class="eyebrow"><span class="badge teal"><span class="dot"></span>Open source · format v1 draft</span></span>
-      <h1>An ID card for online logins <span class="grad">that you own.</span></h1>
-      <p class="lead">rootcard is a login you carry. Servers can check that you are you, but they can never become you,
-        never learn your password, and never keep you from moving. One recovery card, kept in a drawer, can always
-        rebuild everything.</p>
+      <span class="eyebrow">A public rootcard home</span>
+      <h1>A home for your rootcard ID.</h1>
+      <p class="lead">rootcard is an open standard for logins you own: servers can check that you are you, but they can
+        never become you, never learn your password and never keep you from moving. rootcard.org is one of the homes
+        that issue and hold rootcard identities, free to use and with nothing to install.</p>
       <div class="btn-row">
         <a class="btn btn-primary btn-lg" href="/create">Create a card</a>
-        <a class="btn btn-lg btn-ghost" href="#how">How it works</a>
-        <a class="btn btn-lg btn-ghost" href="https://github.com/rootcard/rootcard"><svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
+        <a class="btn btn-lg btn-ghost" href="/rootcard">About rootcard</a>
       </div>
       <div class="hero-facts">
-        <span>No password on any server</span>
+        <span>Your password never reaches this server</span>
         <span>No e-mail reset to hijack</span>
-        <span>Move to any home</span>
+        <span>Leave for another home at any time</span>
       </div>
     </div>
     <div class="hero-visual" aria-label="Example rootcard ID card and recovery card">
@@ -39,185 +38,70 @@
   </div>
 </section>
 
-<section class="band">
+<section class="band" id="about">
   <div class="wrap">
+    <div class="notice warn status-note"><p><b>Early software.</b> rootcard {{rootcard_version}} is pre-1.0 and has not
+      had an external security review. Use it to try things and for low-value accounts, not yet for anything you cannot
+      afford to lose.</p></div>
+    <div class="section-head">
+      <span class="eyebrow">What rootcard.org is</span>
+      <h2>One home among many.</h2>
+      <p>A rootcard identity lives at a home: a server that keeps its public log and encrypted vault and lets you sign
+        in. rootcard.org is a public home for the <code>global</code> realm, run on the open-source
+        <code>rootcard-host</code>. It is not the rootcard project's central server, because there is none.
+        <a href="/policy">Who runs it and what it keeps</a>.</p>
+    </div>
     <div class="grid-3">
       <div class="feature">
-        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
-        <h3>Your password stays on your device</h3>
-        <p>It unlocks an encrypted vault in your browser, which then signs a one-time challenge. The server stores no
-          password hash and has nothing it could replay.</p>
+        <h3>What it keeps</h3>
+        <p>Your public log, your public profile and your vault, encrypted in your browser before it is sent. You can
+          download all of it as one file at any time.</p>
       </div>
       <div class="feature">
-        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg></div>
-        <h3>Servers verify, they never vouch</h3>
-        <p>Your account id is the hash of a statement signed by your own key. Anyone can check it themselves against
-          your public log. Nobody can forge it.</p>
+        <h3>What it cannot do</h3>
+        <p>Read your vault, learn your password, reset it for you, or sign in as you. Your id is signed by your own
+          recovery key, so this server cannot change or forge it.</p>
       </div>
       <div class="feature">
-        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M7 15h4M7 11h10"/></svg></div>
-        <h3>A recovery card you keep</h3>
-        <p>Shown once when you create your identity. It resets a forgotten password and moves you to another home.
-          No backdoor, no help desk, no takeover by e-mail.</p>
+        <h3>Where else you can go</h3>
+        <p>Any other rootcard home, or your own server with <code>rootcard-host</code>. With the recovery card you move
+          in minutes, and your id, handle and password come along.</p>
       </div>
     </div>
     <div class="stat-row" id="stats" hidden>
       <div class="stat"><b id="statCards">0</b><span>identities with rootcard.org as home</span></div>
-      <div class="stat"><b>0</b><span>passwords stored here</span></div>
-      <div class="stat"><b>Ed25519 · Argon2id</b><span>standard, audited cryptography</span></div>
+      <div class="stat"><b>global</b><span>realm served</span></div>
+      <div class="stat"><b>Ed25519 · Argon2id</b><span>standard cryptography</span></div>
     </div>
   </div>
 </section>
 
-<section id="how">
+<section id="start">
   <div class="wrap">
     <div class="section-head">
-      <span class="eyebrow">How it works</span>
-      <h2>A username and a password, backed by signatures.</h2>
-      <p>For you it is a username, a password and a card in a drawer. Under the hood, every step is a signature anyone
-        can check.</p>
+      <span class="eyebrow">Getting started</span>
+      <h2>A username, a password and a card in a drawer.</h2>
     </div>
     <div class="steps">
-      <div class="step"><h3>Create</h3><p>Pick a username and a password. Your browser makes a recovery key and prints
-        it as a recovery card. Your id is the SHA-256 of a statement signed by that key, shown to people as
-        <code>Astra#3F9C</code>.</p></div>
-      <div class="step"><h3>Choose a home</h3><p>The recovery key signs an instance: a fresh account key and the server
-        that is your home. Here that is rootcard.org, so you need no server of your own.</p></div>
-      <div class="step"><h3>Sign in</h3><p>Your device proves the password to fetch the vault, unlocks it locally and
-        signs the home's one-time challenge. The password never leaves your device.</p></div>
-      <div class="step"><h3>Prove</h3><p>Any service, on any server, can ask you to sign a challenge and check it against
-        your public log. It does not call a central API and does not trust your home's word.</p></div>
-      <div class="step"><h3>Download and move</h3><p>Download your whole account as one file at any time. With the
-        recovery card, move it to another home in minutes; your id, handle and password come along.</p></div>
-      <div class="step"><h3>Recover</h3><p>Forgot the password or lost a device? The recovery card signs a new instance.
-        Every old password, vault and session stops working at once. Your id stays.</p></div>
+      <div class="step"><h3>Create</h3><p>Pick a username and a password. Your browser makes the keys and a recovery
+        card for you to download or print. Only then is the signed, encrypted registration sent here.</p></div>
+      <div class="step"><h3>Sign in and prove</h3><p>Sign in here to edit your profile and private data, and make proofs
+        that any service can check against your public log, without asking rootcard.org.</p></div>
+      <div class="step"><h3>Keep the card</h3><p>The recovery card resets a forgotten password and moves you to another
+        home with the <a href="/keytool">key tool</a>. Nobody else can do either for you.</p></div>
     </div>
+    <p class="muted more">How the signatures, the two power levels and the comparison with passwords and passkeys work:
+      <a href="/rootcard">About rootcard</a>. Building on it: <a href="/developers">Developers</a>.</p>
   </div>
 </section>
 
-<section class="band">
-  <div class="wrap">
-    <div class="section-head">
-      <span class="eyebrow">Two power levels</span>
-      <h2>The password is for every day. The recovery card is for everything else.</h2>
-      <p>The format itself enforces the split: only the recovery key can sign changes to who can access the identity,
-        where it lives or whether it exists.</p>
-    </div>
-    <div class="power">
-      <div class="power-card low">
-        <span class="who">password · in your head · any app</span>
-        <h3>Low power</h3>
-        <ul>
-          <li>Sign in to your home</li>
-          <li>Edit your public profile and private data</li>
-          <li>Change the password (with the old one)</li>
-          <li>Download your account file</li>
-          <li>Prove who you are to a service</li>
-        </ul>
-      </div>
-      <div class="power-card high">
-        <span class="who">recovery card · offline · key tool only</span>
-        <h3>High power</h3>
-        <ul>
-          <li>Reset a forgotten password</li>
-          <li>Add or revoke passwords</li>
-          <li>Move to another home, or restore after a loss</li>
-          <li>Rotate the recovery key itself</li>
-          <li>Retire the identity for good</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section>
-  <div class="wrap">
-    <div class="section-head">
-      <span class="eyebrow">Two ways to use it</span>
-      <h2>A safer login for your service. One identity for many.</h2>
-    </div>
-    <div class="grid-2">
-      <div class="panel">
-        <h3>A standard username-and-password login</h3>
-        <p class="muted">Add rootcard to your own server and your users see what they already know: a username, a
-          password and, once, a recovery card to save. Your server becomes the <em>host</em> with
-          <code>rootcard-host</code> (Rust); your pages use the npm package. No redirect, no third party, no password
-          database to leak.</p>
-        <a href="/developers">Integrate rootcard →</a>
-      </div>
-      <div class="panel">
-        <h3>An ID card across websites</h3>
-        <p class="muted">Choose a home: rootcard.org, a host run by someone you trust, or your own. Any other service
-          checks who you are by itself, from a fresh proof addressed to it. Your account there is keyed by your account
-          id, which never changes, even when you move.</p>
-        <a href="/create">Create a card with rootcard.org as home →</a>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section id="compare" class="band">
-  <div class="wrap">
-    <div class="section-head">
-      <span class="eyebrow">How it compares</span>
-      <h2>Where it stands.</h2>
-      <p>Against database leaks, replay and lock-in, rootcard does better than password logins and social logins. It
-        does not yet match passkeys against phishing, and it is young.</p>
-    </div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr><th></th><th>Password + hash</th><th>Passkeys</th><th>"Sign in with …"</th><th class="us">rootcard</th></tr>
-        </thead>
-        <tbody>
-          <tr><th>Server learns the password</th><td>At every login</td><td>No password</td><td>The provider does</td><td class="us">Never sent</td></tr>
-          <tr><th>Server database stolen</th><td>Offline guessing of hashes</td><td>Nothing useful</td><td>Provider's database</td><td class="us">Offline guessing of the vault (Argon2id, 64 MiB), home only</td></tr>
-          <tr><th>Replay of a login</th><td>Session theft</td><td>No</td><td>Token theft</td><td class="us">No: one-time, bound signatures</td></tr>
-          <tr><th>Forgotten password</th><td>E-mail reset</td><td>Platform recovery</td><td>The provider decides</td><td class="us">Recovery card only; no backdoor</td></tr>
-          <tr><th>Who controls the identity</th><td>The service</td><td>The site and your sync provider</td><td>The provider</td><td class="us"><b>You</b>, through the recovery key</td></tr>
-          <tr><th>Move to another provider</th><td>New account</td><td>New credential per site</td><td>New account</td><td class="us">Same id, one key tool operation</td></tr>
-          <tr><th>Phishing</th><td>Vulnerable</td><td><b>Resistant</b></td><td>Vulnerable at the provider</td><td class="us">Relayed logins fail; a fake page can still capture the password</td></tr>
-          <tr><th>Maturity</th><td>Decades</td><td>Widely deployed</td><td>Widely deployed</td><td class="us">New, not yet externally reviewed</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</section>
-
-<section>
-  <div class="wrap grid-2 align-center">
-    <div>
-      <span class="eyebrow">For developers</span>
-      <h2>Two libraries and one HTTP binding.</h2>
-      <p class="muted">Rust and JavaScript implement the same functions and produce the same bytes, checked against shared
-        test vectors. The JavaScript package has zero dependencies and runs on WebCrypto in browsers and Node 20+. A host
-        never sees a password, never runs Argon2id and verifies logs incrementally.</p>
-      <div class="btn-row">
-        <a class="btn" href="/developers">Developer guide</a>
-        <a class="btn btn-ghost" href="https://github.com/rootcard/rootcard/blob/main/spec/SPEC.md">Read the spec</a>
-        <a class="btn btn-ghost" href="https://github.com/rootcard/rootcard">Source on GitHub</a>
-      </div>
-    </div>
-    <pre><span class="c">// Verify a proof from anyone, against their public log</span>
-<span class="k">import</span> { verifyProof } <span class="k">from</span> <span class="s">"rootcard"</span>;
-
-<span class="k">const</span> state = <span class="k">await</span> verifyProof(proof, log, challenge,
-  <span class="s">"https://shop.example"</span>, { realms: [<span class="s">"global"</span>], now });
-
-console.log(state.handle);   <span class="c">// "Astra#3F9C"</span></pre>
-  </div>
-</section>
-
-<section id="faq" class="band">
+<section id="faq">
   <div class="wrap">
     <div class="section-head">
       <span class="eyebrow">Questions</span>
       <h2>Good to know</h2>
     </div>
     <div class="faq">
-      <details><summary>Does rootcard.org keep a copy of my account?</summary>
-        <p>Yes. As your home it keeps the public log, the public profile and the encrypted vault. It cannot decrypt the
-          vault and cannot reset your password. You can download the whole account as one file at any time.</p></details>
       <details><summary>What happens if I lose the recovery card?</summary>
         <p>The identity keeps working with your password, but it can no longer be reset or moved. If you then also forget
           the password, the identity is gone. Nobody, rootcard.org included, can recover it: that is the point.</p></details>
@@ -231,24 +115,6 @@ console.log(state.handle);   <span class="c">// "Astra#3F9C"</span></pre>
       <details><summary>Can services link my accounts?</summary>
         <p>Every service gets its own proof, valid only for that service. If you do not want services to link your
           accounts, create several identities: they cannot be linked by their public data.</p></details>
-      <details><summary>Is it ready?</summary>
-        <p>rootcard is published and usable, but pre-1.0: the format is a draft and has not had an external security
-          review. Use it to try things and for low-value accounts, not yet for anything you cannot afford to lose.</p></details>
-    </div>
-  </div>
-</section>
-
-<section>
-  <div class="wrap">
-    <div class="cta">
-      <span class="eyebrow">No server of your own needed</span>
-      <h2>Try it with rootcard.org as your home.</h2>
-      <p>Everything happens in your browser: the keys, the vault, the card. rootcard.org becomes your home and never sees
-        your password.</p>
-      <div class="btn-row">
-        <a class="btn btn-primary btn-lg" href="/create">Create a card</a>
-        <a class="btn btn-lg btn-ghost" href="/account">I already have one</a>
-      </div>
     </div>
   </div>
 </section>
