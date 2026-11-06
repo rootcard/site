@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<title>About rootcard — rootcard.org</title>
+<meta name="description" content="rootcard is an open standard for logins you own: a username and password backed by signatures, a recovery card you keep, and homes you can move between. How it works and how it compares.">
+<!--#include head-->
+</head>
+<body data-page="rootcard">
+<!--#include header-->
+<main id="main">
+  <div class="wrap page-head">
+    <span class="eyebrow">About rootcard</span>
+    <h1>An open standard for logins you own.</h1>
+    <p>rootcard is a specification with open-source libraries in Rust and JavaScript. It is not a company or a single
+      service: any server can be a home for rootcard identities, and rootcard.org is one of them. This page explains the
+      standard; the <a href="https://github.com/rootcard/rootcard/blob/main/spec/SPEC.md">specification</a> is the
+      reference.</p>
+  </div>
+
+<section id="how">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">How it works</span>
+      <h2>A username and a password, backed by signatures.</h2>
+      <p>For you it is a username, a password and a card in a drawer. Under the hood, every step is a signature anyone
+        can check.</p>
+    </div>
+    <div class="steps">
+      <div class="step"><h3>Create</h3><p>Pick a username and a password. Your browser makes a recovery key and prints
+        it as a recovery card. Your id is the SHA-256 of a statement signed by that key, shown to people as
+        <code>Astra#3F9C</code>.</p></div>
+      <div class="step"><h3>Choose a home</h3><p>The recovery key signs an instance: a fresh account key and the server
+        that is your home. That can be rootcard.org, another public home or your own server.</p></div>
+      <div class="step"><h3>Sign in</h3><p>Your device proves the password to fetch the vault, unlocks it locally and
+        signs the home's one-time challenge. The password never leaves your device.</p></div>
+      <div class="step"><h3>Prove</h3><p>Any service, on any server, can ask you to sign a challenge and check it against
+        your public log. It does not call a central API and does not trust your home's word.</p></div>
+      <div class="step"><h3>Download and move</h3><p>Download your whole account as one file at any time. With the
+        recovery card, move it to another home in minutes; your id, handle and password come along.</p></div>
+      <div class="step"><h3>Recover</h3><p>Forgot the password or lost a device? The recovery card signs a new instance.
+        Every old password, vault and session stops working at once. Your id stays.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Two power levels</span>
+      <h2>The password is for every day. The recovery card is for everything else.</h2>
+      <p>The format itself enforces the split: only the recovery key can sign changes to who can access the identity,
+        where it lives or whether it exists.</p>
+    </div>
+    <div class="power">
+      <div class="power-card low">
+        <span class="who">password · in your head · any app</span>
+        <h3>Low power</h3>
+        <ul>
+          <li>Sign in to your home</li>
+          <li>Edit your public profile and private data</li>
+          <li>Change the password (with the old one)</li>
+          <li>Download your account file</li>
+          <li>Prove who you are to a service</li>
+        </ul>
+      </div>
+      <div class="power-card high">
+        <span class="who">recovery card · offline · key tool only</span>
+        <h3>High power</h3>
+        <ul>
+          <li>Reset a forgotten password</li>
+          <li>Add or revoke passwords</li>
+          <li>Move to another home, or restore after a loss</li>
+          <li>Rotate the recovery key itself</li>
+          <li>Retire the identity for good</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Two ways to use it</span>
+      <h2>A safer login for your service. One identity for many.</h2>
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <h3>A standard username-and-password login</h3>
+        <p class="muted">Add rootcard to your own server and your users see what they already know: a username, a
+          password and, once, a recovery card to save. Your server becomes the <em>host</em> with
+          <code>rootcard-host</code> (Rust); your pages use the npm package. No redirect, no third party, no password
+          database to leak.</p>
+        <a href="/developers">Integrate rootcard →</a>
+      </div>
+      <div class="panel">
+        <h3>An ID card across websites</h3>
+        <p class="muted">Choose a home: rootcard.org, a host run by someone you trust, or your own. Any other service
+          checks who you are by itself, from a fresh proof addressed to it. Your account there is keyed by your account
+          id, which never changes, even when you move.</p>
+        <a href="/create">Create a card with rootcard.org as home →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="compare" class="band">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">How it compares</span>
+      <h2>Where it stands.</h2>
+      <p>Against database leaks, replay and lock-in, rootcard does better than password logins and social logins. It
+        does not yet match passkeys against phishing, and it is young.</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th></th><th>Password + hash</th><th>Passkeys</th><th>"Sign in with …"</th><th class="us">rootcard</th></tr>
+        </thead>
+        <tbody>
+          <tr><th>Server learns the password</th><td>At every login</td><td>No password</td><td>The provider does</td><td class="us">Never sent</td></tr>
+          <tr><th>Server database stolen</th><td>Offline guessing of hashes</td><td>Nothing useful</td><td>Provider's database</td><td class="us">Offline guessing of the vault (Argon2id, 64 MiB), home only</td></tr>
+          <tr><th>Replay of a login</th><td>Session theft</td><td>No</td><td>Token theft</td><td class="us">No: one-time, bound signatures</td></tr>
+          <tr><th>Forgotten password</th><td>E-mail reset</td><td>Platform recovery</td><td>The provider decides</td><td class="us">Recovery card only; no backdoor</td></tr>
+          <tr><th>Who controls the identity</th><td>The service</td><td>The site and your sync provider</td><td>The provider</td><td class="us"><b>You</b>, through the recovery key</td></tr>
+          <tr><th>Move to another provider</th><td>New account</td><td>New credential per site</td><td>New account</td><td class="us">Same id, one key tool operation</td></tr>
+          <tr><th>Phishing</th><td>Vulnerable</td><td><b>Resistant</b></td><td>Vulnerable at the provider</td><td class="us">Relayed logins fail; a fake page can still capture the password</td></tr>
+          <tr><th>Maturity</th><td>Decades</td><td>Widely deployed</td><td>Widely deployed</td><td class="us">New, not yet externally reviewed</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap grid-2 align-center">
+    <div>
+      <span class="eyebrow">For developers</span>
+      <h2>Two libraries and one HTTP binding.</h2>
+      <p class="muted">Rust and JavaScript implement the same functions and produce the same bytes, checked against shared
+        test vectors. The JavaScript package has zero dependencies and runs on WebCrypto in browsers and Node 20+. A host
+        never sees a password, never runs Argon2id and verifies logs incrementally.</p>
+      <div class="btn-row">
+        <a class="btn" href="/developers">Developer guide</a>
+        <a class="btn btn-ghost" href="https://github.com/rootcard/rootcard/blob/main/spec/SPEC.md">Read the spec</a>
+        <a class="btn btn-ghost" href="https://github.com/rootcard/rootcard">Source on GitHub</a>
+      </div>
+    </div>
+    <pre><span class="c">// Verify a proof from anyone, against their public log</span>
+<span class="k">import</span> { verifyProof } <span class="k">from</span> <span class="s">"rootcard"</span>;
+
+<span class="k">const</span> state = <span class="k">await</span> verifyProof(proof, log, challenge,
+  <span class="s">"https://shop.example"</span>, { realms: [<span class="s">"global"</span>], now });
+
+console.log(state.handle);   <span class="c">// "Astra#3F9C"</span></pre>
+  </div>
+</section>
+
+</main>
+<!--#include footer-->
+</body>
+</html>
