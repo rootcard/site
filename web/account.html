@@ -138,12 +138,19 @@
           <div class="field">
             <label for="challenge">Challenge</label>
             <textarea id="challenge" placeholder="64 hex characters, or a JSON statement"></textarea>
-            <span class="hint">A JSON statement is hashed into the challenge; say what it is for and until when.</span>
+            <span class="hint">A JSON statement is hashed into the challenge; say what it is for and until when, for
+              example <code>"I am Astra on example.social, until 2027-06-30"</code>. For a public statement, name where
+              you publish it as the recipient.</span>
           </div>
           <div class="btn-row"><button class="btn btn-primary" type="submit">Sign proof</button>
-            <button class="btn" type="button" id="copyProof" hidden>Copy</button></div>
+            <button class="btn" type="button" id="copyProof" hidden>Copy</button>
+            <button class="btn" type="button" id="copyProofLink" hidden>Copy link</button>
+            <a class="btn btn-ghost" id="openProof" href="/card" target="_blank" rel="noopener" hidden>Check it on the card page</a></div>
           <div class="status" id="proveStatus" aria-live="polite"></div>
           <pre id="proofOut" hidden></pre>
+          <p class="hint" id="proofLinkNote" hidden>The link carries the proof and the statement in its <code>#</code>
+            part, which browsers never send to a server. Whoever opens it sees the proof checked against your log at
+            this home and stamped on your ID card. Publish it only for a statement you want anyone to see.</p>
         </form>
 
         <section class="panel" data-panel="recovery" hidden>

@@ -82,11 +82,16 @@ const WHY = {
   rate_limited: "Too many attempts. Wait a little and try again.",
   account_retired: "This identity has been retired by its owner.",
   unsupported_browser: "This browser lacks WebCrypto Ed25519 and X25519. Use a current Chrome, Edge, Firefox or Safari.",
-  stale_version: "The identity changed meanwhile. Reload and try again.",
+  stale_version: "The identity changed meanwhile: the proof or page is out of date. Reload and try again.",
   challenge_expired: "That took too long. Try again.",
   wrong_host: "This home does not hold that identity's current instance.",
   wrong_recipient: "The proof is addressed to someone else.",
-  wrong_challenge: "The proof was made for another challenge.",
+  wrong_challenge: "The proof was made for another challenge or statement.",
+  account_mismatch: "The proof and the log are of different identities.",
+  fork: "The log sent with the proof and the log at its home disagree (a fork).",
+  no_instance: "The identity has no current instance, so no account proof can be valid.",
+  bad_field: "That is not a well-formed proof.",
+  bad_json: "That is not valid JSON.",
   bad_signature: "A signature does not verify.",
   too_large: "That is too large.",
   bad_data_key: "That profile field is not allowed.",
@@ -192,8 +197,10 @@ function hostOf(url) {
 }
 
 /**
- * Render an ID card into `el`. `c`: `{ username, account, realm, home?, since?, display?, verified?, recovery?, key? }`.
- * Every value is set as text, never as markup: profile data is written by the identity's owner.
+ * Render an ID card into `el`. `c`: `{ username, account, realm, home?, since?, display?, verified?, recovery?, key?,
+ * proof? }`. `proof` is `{ level, title, detail? }` with level "ok", "info" (valid, but a statement anyone may hold),
+ * "warn" (valid signature, not everything checked) or "bad": it is shown as a stamp on the card.
+ * Every value is set as text, never as markup: profile data and proof recipients are written by others.
  */
 export function renderCard(el, c) {
   el.replaceChildren();
@@ -244,6 +251,15 @@ export function renderCard(el, c) {
   }
   bottom.append(meta);
   el.append(top, mid, bottom);
+  for (const l of ["ok", "info", "warn", "bad"]) el.classList.toggle(`proof-${l}`, c.proof?.level === l);
+  if (c.proof) {
+    const stamp = h("div", `ic-stamp ${c.proof.level}`);
+    stamp.setAttribute("role", "status");
+    const icon = { ok: "✓", info: "✓", warn: "!", bad: "✕" }[c.proof.level] ?? "?";
+    stamp.append(h("span", "ic-stamp-icon", icon), h("span", "ic-stamp-title", c.proof.title));
+    if (c.proof.detail) stamp.append(h("span", "ic-stamp-detail", c.proof.detail));
+    el.append(stamp);
+  }
 }
 
 /** A subtle 3D tilt that follows the pointer. */

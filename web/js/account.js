@@ -134,6 +134,9 @@ async function signOut() {
   $("signedIn").hidden = true;
   $("signedOut").hidden = false;
   $("lockField").hidden = true;
+  // Proofs of the signed-out identity stay valid, but are not left on screen for the next person.
+  for (const id of ["proofOut", "copyProof", "copyProofLink", "openProof", "proofLinkNote"]) $(id).hidden = true;
+  $("proofOut").textContent = "";
 }
 
 // The unlocked vault cannot survive the page; end the session with it.
@@ -286,10 +289,17 @@ $("passwordForm").addEventListener("submit", (e) => {
   });
 });
 
+/** The challenge: 64 hex characters from the verifier, or a JSON statement hashed per [PRF-5] (returned with it). */
 async function challengeOf(text) {
   const t = text.trim();
-  if (/^[0-9a-fA-F]{64}$/.test(t)) return rc.hexDecode(t);
-  return rc.statementChallenge(rc.parseJson(new TextEncoder().encode(t)));
+  if (/^[0-9a-fA-F]{64}$/.test(t)) return { challenge: rc.hexDecode(t) };
+  let statement;
+  try {
+    statement = rc.parseJson(new TextEncoder().encode(t));
+  } catch {
+    throw new Error("The challenge is neither 64 hex characters nor JSON. A plain sentence needs quotes: \"I am Astra\".");
+  }
+  return { challenge: await rc.statementChallenge(statement), statement };
 }
 
 $("proveForm").addEventListener("submit", (e) => {
@@ -299,13 +309,25 @@ $("proveForm").addEventListener("submit", (e) => {
     try {
       const recipient = $("recipient").value.trim();
       if (!recipient) throw new Error("Name the recipient: the service the proof is for.");
-      const challenge = await challengeOf($("challenge").value);
+      const { challenge, statement } = await challengeOf($("challenge").value);
       const proof = await rc.prove(S.state, "account", S.u.contents.accountSeed, challenge, recipient);
-      const out = rc.canonicalString({ proof, log: S.log });
-      $("proofOut").textContent = out;
+      // The statement travels with its proof, so the verifier can read what was signed ([PRF-5]).
+      const bundle = statement === undefined ? { proof, log: S.log } : { proof, log: S.log, statement };
+      $("proofOut").textContent = rc.canonicalString(bundle);
       $("proofOut").hidden = false;
       $("copyProof").hidden = false;
-      status(st, "ok", "Signed. Send the proof and your log to the recipient; it verifies both itself.");
+      // A link for statements: the log stays out (this home serves it), so the link stays short.
+      const link = statement === undefined
+        ? ""
+        : `${location.origin}/card#proof=${rc.base64urlEncode(new TextEncoder().encode(rc.canonicalString({ proof, statement })))}`;
+      $("copyProofLink").hidden = !link;
+      $("copyProofLink").dataset.link = link;
+      $("openProof").hidden = !link;
+      $("openProof").href = link || "/card";
+      $("proofLinkNote").hidden = !link;
+      status(st, "ok", statement === undefined
+        ? "Signed. Send the proof and your log to the recipient; it verifies both itself."
+        : "Signed. Send it, or share the link: anyone can check the statement on the card page.");
     } catch (err) {
       status(st, "error", explain(err));
     }
@@ -317,5 +339,13 @@ $("copyProof").addEventListener("click", async () => {
     status($("proveStatus"), "ok", "Copied.");
   } catch {
     status($("proveStatus"), "warn", "Copy failed; select the text instead.");
+  }
+});
+$("copyProofLink").addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText($("copyProofLink").dataset.link);
+    status($("proveStatus"), "ok", "Link copied.");
+  } catch {
+    status($("proveStatus"), "warn", "Copy failed; use “Check it on the card page” and copy its address.");
   }
 });

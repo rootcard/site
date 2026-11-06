@@ -29,7 +29,7 @@ use axum::http::{HeaderMap, HeaderValue, Method, StatusCode, header};
 use axum::response::Response;
 use limits::{Limiter, classify};
 use rootcard::encoding::{hex_decode, hex_encode};
-use rootcard_host::http::{MAX_BODY, Request as HostRequest, route};
+use rootcard_host::http::{MAX_BODY, Request as HostRequest, Response as HostResponse, route, well_known};
 use rootcard_host::peer::PeerHeaders;
 use rootcard_host::{Host, HostConfig, RealmConfig, UsernamePolicy};
 use std::net::SocketAddr;
@@ -40,6 +40,9 @@ use store::Db;
 use zeroize::Zeroizing;
 
 type SiteHost = Host<Db, Db, Db>;
+
+/// The path of the host pointer ([HST-23]), at the root of the origin.
+const WELL_KNOWN_PATH: &str = rootcard::WELL_KNOWN_PATH;
 
 struct App {
     host: SiteHost,
@@ -290,6 +293,8 @@ async fn handle(
     let path = req.uri().path().to_string();
     let mut res = if is_api(&path) {
         api(&app, peer, req).await
+    } else if path == WELL_KNOWN_PATH {
+        host_pointer(&app, req.method(), req.headers())
     } else {
         site(&app, req.method(), &path, req.headers()).await
     };
@@ -352,6 +357,11 @@ async fn api(app: &Arc<App>, peer: SocketAddr, req: axum::extract::Request) -> R
     let Ok(out) = tokio::task::spawn_blocking(move || route(&a.host, &host_req, now(), &mut random)).await else {
         return json_error(500, "internal");
     };
+    host_response(out)
+}
+
+/// An answer of `rootcard_host` as an axum response, with the API's own CSP.
+fn host_response(out: HostResponse) -> Response {
     let has_body = out.body.is_some();
     let mut r = Response::new(Body::from(out.body.unwrap_or_default()));
     *r.status_mut() = StatusCode::from_u16(out.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
@@ -367,6 +377,36 @@ async fn api(app: &Arc<App>, peer: SocketAddr, req: axum::extract::Request) -> R
         if let (Ok(k), Ok(v)) = (header::HeaderName::try_from(k), HeaderValue::from_str(&v)) {
             h.append(k, v);
         }
+    }
+    r
+}
+
+/// The configured base URL whose host is `host` (the request's `Host` header, compared without regard to ASCII case).
+/// The site's base URLs are origins, so this is the origin the request arrived at, without trusting a scheme header.
+fn origin_for<'a>(urls: &'a [String], host: &str) -> Option<&'a str> {
+    urls.iter()
+        .map(String::as_str)
+        .find(|u| u.split_once("://").is_some_and(|(_, h)| h.eq_ignore_ascii_case(host)))
+}
+
+/// The host pointer `GET /.well-known/rootcard` ([HST-23], HOST_PROTOCOL.md §2): `{ "v": 1, "base", "api" }` naming this
+/// origin, so a client given the bare domain resolves it to the base URL (here the origin itself).
+fn host_pointer(app: &App, method: &Method, headers: &HeaderMap) -> Response {
+    if method != Method::GET && method != Method::HEAD {
+        let mut r = Response::new(Body::empty());
+        *r.status_mut() = StatusCode::METHOD_NOT_ALLOWED;
+        r.headers_mut()
+            .insert(header::ALLOW, HeaderValue::from_static("GET, HEAD"));
+        return r;
+    }
+    let host = headers.get(header::HOST).and_then(|v| v.to_str().ok()).unwrap_or("");
+    let Some(origin) = origin_for(&app.host.config.urls, host) else {
+        // As `well_known` answers when no address is on the origin.
+        return json_error(404, "unknown_account");
+    };
+    let mut r = host_response(well_known(&app.host.config, origin));
+    if method == Method::HEAD {
+        *r.body_mut() = Body::empty();
     }
     r
 }
@@ -470,5 +510,14 @@ mod tests {
         assert_eq!(asset_for("/create").map(|a| a.path), Some("/create.html"));
         assert!(asset_for("/_partials/header").is_none());
         assert!(asset_for("/../Cargo.toml").is_none());
+    }
+
+    #[test]
+    fn pointer_origin() {
+        let urls = vec!["https://rootcard.org".to_string(), "http://127.0.0.1:8080".to_string()];
+        assert_eq!(origin_for(&urls, "RootCard.org"), Some("https://rootcard.org"));
+        assert_eq!(origin_for(&urls, "127.0.0.1:8080"), Some("http://127.0.0.1:8080"));
+        assert_eq!(origin_for(&urls, "127.0.0.1"), None);
+        assert_eq!(origin_for(&urls, "evil.example"), None);
     }
 }

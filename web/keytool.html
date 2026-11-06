@@ -55,9 +55,10 @@
           <li>Open the saved <code>rootcard-keytool.html</code>.</li>
           <li>Load your recovery card file (<code>.card.json</code>), or type the recovery key, realm <code>global</code> and
             your username.</li>
-          <li>Enter <code>https://rootcard.org</code> as the host.</li>
-          <li>Choose the operation. To move here from another home, enter <code>https://rootcard.org</code> as the
-            target host.</li>
+          <li>Enter <code>rootcard.org</code> as the host (the key tool adds <code>https://</code> and checks this
+            home's <code>/.well-known/rootcard</code>).</li>
+          <li>Choose the operation. To move here from another home, enter <code>rootcard.org</code> as the target
+            host.</li>
         </ol>
         <div class="notice warn"><p>Never type your recovery key into a website, this one included. A page a server
           sends you can be changed by that server; a file on your disk cannot.</p></div>
