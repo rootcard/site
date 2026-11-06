@@ -301,7 +301,7 @@ async fn handle(
     } else if path == WELL_KNOWN_PATH {
         host_pointer(&app, req.method(), req.headers())
     } else {
-        site(&app, req.method(), &path, req.headers()).await
+        site(&app, req.method(), &path, req.uri().query(), req.headers()).await
     };
     security_headers(&app, res.headers_mut());
     res
@@ -428,7 +428,19 @@ fn asset_for(path: &str) -> Option<&'static assets::Asset> {
     assets::find(p).or_else(|| assets::find(&format!("{p}.html")))
 }
 
-async fn site(app: &Arc<App>, method: &Method, path: &str, headers: &HeaderMap) -> Response {
+/// The one address of a page reached another way: `/create.html` and `/create/` are `/create`, `/index.html` and
+/// `/index` are `/`. `None` for a path that is already canonical or is not a page.
+fn canonical_path(path: &str) -> Option<String> {
+    let asset = asset_for(path)?;
+    if !asset.path.ends_with(".html") || asset.path.starts_with("/vendor/") || asset.path == "/404.html" {
+        return None;
+    }
+    let page = asset.path.trim_end_matches(".html");
+    let page = if page == "/index" { "/" } else { page };
+    (path != page).then(|| page.to_string())
+}
+
+async fn site(app: &Arc<App>, method: &Method, path: &str, query: Option<&str>, headers: &HeaderMap) -> Response {
     if method != Method::GET && method != Method::HEAD {
         let mut r = Response::new(Body::empty());
         *r.status_mut() = StatusCode::METHOD_NOT_ALLOWED;
@@ -449,6 +461,18 @@ async fn site(app: &Arc<App>, method: &Method, path: &str, headers: &HeaderMap) 
     }
     // The key tool is meant to be opened from the user's own disk (rootcard SPEC [PWR-6]): it is only ever downloaded
     // from here, never rendered, so this site never runs a page that asks for a recovery key.
+    if let Some(page) = canonical_path(path) {
+        let location = match query {
+            Some(q) => format!("{page}?{q}"),
+            None => page,
+        };
+        let mut r = Response::new(Body::empty());
+        *r.status_mut() = StatusCode::MOVED_PERMANENTLY;
+        if let Ok(v) = HeaderValue::from_str(&location) {
+            r.headers_mut().insert(header::LOCATION, v);
+        }
+        return r;
+    }
     let download = path == "/download/rootcard-keytool.html";
     let lookup = if download {
         assets::find("/vendor/rootcard/keytool.html")
@@ -456,8 +480,9 @@ async fn site(app: &Arc<App>, method: &Method, path: &str, headers: &HeaderMap) 
         asset_for(path)
     };
     let (status, asset) = match lookup {
-        Some(a) => (StatusCode::OK, a),
-        None => match assets::find("/404.html") {
+        // The not-found page is never found at an address of its own.
+        Some(a) if a.path != "/404.html" => (StatusCode::OK, a),
+        _ => match assets::find("/404.html") {
             Some(a) => (StatusCode::NOT_FOUND, a),
             None => {
                 let mut r = Response::new(Body::from("not found"));
@@ -515,6 +540,35 @@ mod tests {
         assert_eq!(asset_for("/create").map(|a| a.path), Some("/create.html"));
         assert!(asset_for("/_partials/header").is_none());
         assert!(asset_for("/../Cargo.toml").is_none());
+    }
+
+    #[test]
+    fn canonical_paths() {
+        assert_eq!(canonical_path("/create.html").as_deref(), Some("/create"));
+        assert_eq!(canonical_path("/create/").as_deref(), Some("/create"));
+        assert_eq!(canonical_path("/index.html").as_deref(), Some("/"));
+        assert_eq!(canonical_path("/index").as_deref(), Some("/"));
+        assert_eq!(canonical_path("/"), None);
+        assert_eq!(canonical_path("/create"), None);
+        assert_eq!(canonical_path("/404"), None);
+        assert_eq!(canonical_path("/css/site.css"), None);
+        assert_eq!(canonical_path("/vendor/rootcard/keytool.html"), None);
+        assert_eq!(canonical_path("/nope.html"), None);
+    }
+
+    #[test]
+    fn search_metadata() {
+        // Every indexable page names its canonical URL and is in the sitemap; robots.txt points at the sitemap.
+        let sitemap = std::str::from_utf8(assets::find("/sitemap.xml").expect("sitemap").body).expect("utf-8");
+        let create = std::str::from_utf8(assets::find("/create.html").expect("create").body).expect("utf-8");
+        assert!(create.contains(&format!("<link rel=\"canonical\" href=\"{HOME_URL}/create\">")));
+        assert!(sitemap.contains(&format!("<loc>{HOME_URL}/</loc>")));
+        assert!(sitemap.contains(&format!("<loc>{HOME_URL}/create</loc>")));
+        assert!(!sitemap.contains("/404") && !sitemap.contains("/account") && !sitemap.contains("/vendor/"));
+        let robots = std::str::from_utf8(assets::find("/robots.txt").expect("robots").body).expect("utf-8");
+        if robots.contains("Sitemap:") {
+            assert!(robots.contains(&format!("Sitemap: {HOME_URL}/sitemap.xml")));
+        }
     }
 
     #[test]

@@ -55,8 +55,12 @@ built in CI, with an overlay that replaces `robots.txt`:
 ROOTCARD_HOME=homes/example/home.toml cargo build --release
 ```
 
-`build.rs` fills `{{home.*}}` in the pages (HTML-escaped), generates `/js/home-config.js` (the same values for the
-scripts) and `/site.webmanifest`, and fails on a placeholder it does not know. The pages say what *this* home stores and
+`build.rs` fills `{{home.*}}` in the pages (HTML-escaped) and `robots.txt`, gives every page a canonical link and Open
+Graph tags from its own title and description, generates `/js/home-config.js` (the same values for the scripts),
+`/site.webmanifest` and `/sitemap.xml` (every page not marked `noindex`), and fails on a placeholder it does not know.
+The server redirects `/page.html` and `/page/` to `/page`. The link preview image `img/og.png` (1200×630) shows the
+rootcard.org name: put your own in your overlay, with the PNG icons (`favicon.ico`, `img/icon-*.png`,
+`img/apple-touch-icon.png`) if you change the logo. The pages say what *this* home stores and
 how to leave it, which holds for any home running this software unchanged; if you change the software or the storage,
 update `policy.html` (in your overlay) to match. Before opening a home to the public, publish contact details in the
 operator identity's public profile and keep the host key with the database backups. The binary serves the host at the
@@ -69,7 +73,7 @@ src/main.rs      axum server: routing, security headers, config, static assets
 src/store.rs     SQLite IdentityStore / ChallengeStore / SessionStore (schema of rootcard ARCHITECTURE.md §3.1)
 src/limits.rs    rate limits of HOST_PROTOCOL.md §6, per address and per identity
 build.rs         embeds web/ into the binary for the home of home.toml (overlay, partials, {{home.*}}, version and
-                 key tool hash substituted, home-config.js and webmanifest generated, ETags)
+                 key tool hash substituted, home-config.js, webmanifest and sitemap generated, ETags)
 home.toml        this build's home: rootcard.org
 homes/example    another home built from the same sources
 web/             pages, CSS, JS, logo; web/_partials are included into every page
