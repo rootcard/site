@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="en">
 <head>
-<title>Create a card — rootcard.org</title>
-<meta name="description" content="Create a rootcard identity with rootcard.org as its home. The keys are made in your browser; the server never sees your password.">
+<title>Create a card — {{home.name}}</title>
+<meta name="description" content="Create a rootcard identity with {{home.name}} as its home. The keys are made in your browser; the server never sees your password.">
 <!--#include head-->
 </head>
 <body data-page="create">
@@ -11,7 +11,7 @@
   <div class="wrap page-head">
     <span class="eyebrow">Create a card</span>
     <h1>Your identity, made in your browser.</h1>
-    <p>rootcard.org becomes your home: it stores your public log and your encrypted vault. The keys are generated on this
+    <p>{{home.name}} becomes your home: it stores your public log and your encrypted vault. The keys are generated on this
       device, and the password never leaves it. You can move to another home later with your recovery card.</p>
     <div class="notice warn status-note"><p><b>Early software.</b> rootcard {{rootcard_version}} is pre-1.0 and has not
       had an external security review. Use it for testing and low-value accounts.</p></div>
@@ -52,7 +52,7 @@
       <section class="panel" id="step2" hidden aria-labelledby="s2h">
         <h2 id="s2h">Save your recovery card</h2>
         <div class="notice warn"><p><b>This is the only copy.</b> The recovery card resets a forgotten password and
-          moves your identity. Nobody can recover your identity without it, not even rootcard.org. Anyone who has it
+          moves your identity. Nobody can recover your identity without it, not even {{home.name}}. Anyone who has it
           controls your identity: keep it offline and private.</p></div>
         <p></p>
         <pre class="recovery-text" id="cardText"></pre>
@@ -77,7 +77,7 @@
       <section class="panel" id="step3" hidden aria-labelledby="s3h">
         <span class="badge ok"><span class="dot"></span>Registered and verified</span>
         <h2 id="s3h">Welcome, <span id="doneHandle"></span></h2>
-        <p class="muted">Your identity is live with rootcard.org as its home. Its log was fetched back and verified in
+        <p class="muted">Your identity is live with {{home.name}} as its home. Its log was fetched back and verified in
           this browser. Download the account file too: with it and the recovery card you can move everything to another
           home at any time.</p>
         <div class="btn-row">
@@ -95,9 +95,9 @@
         <h3>What happens here</h3>
         <dl class="kv">
           <dt>On this device</dt><dd>A random recovery key, your account key, and a vault locked with your password (Argon2id, 64 MiB)</dd>
-          <dt>Sent to rootcard.org</dt><dd>The signed public log, the encrypted vault and an empty public profile</dd>
+          <dt>Sent to {{home.name}}</dt><dd>The signed public log, the encrypted vault and an empty public profile</dd>
           <dt>Never sent</dt><dd>Your password and your recovery key</dd>
-          <dt>Realm</dt><dd><code>global</code></dd>
+          <dt>Realm</dt><dd><code>{{home.realm}}</code></dd>
         </dl>
       </div>
     </aside>

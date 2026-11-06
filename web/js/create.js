@@ -1,8 +1,8 @@
-// Registration with rootcard.org as home ([CLT-1], HOST_PROTOCOL.md §7 "Registration"):
+// Registration with this home ([CLT-1], HOST_PROTOCOL.md §7 "Registration"):
 //   GET /host → build the inception, the pending instance (home = this host), the vault and an empty profile in the
 //   browser → the user saves the recovery card → POST /id/register → fetch the log back and verify it.
 
-import { BASE, REALM, busy, download, explain, fetchLog, http, instanceTime, now, rc, renderCard, status, tilt, work } from "/js/common.js";
+import { BASE, HOME, REALM, busy, download, explain, fetchLog, http, instanceTime, now, rc, renderCard, status, tilt, work } from "/js/common.js";
 import { checkPassword } from "/vendor/rootcard/src/vault.js";
 
 const $ = (id) => document.getElementById(id);
@@ -139,7 +139,7 @@ $("activate").addEventListener("click", () => {
   busy(panel, async () => {
     try {
       const { password } = checkInputs();
-      status($("status2"), "busy", "Asking rootcard.org for its host key…");
+      status($("status2"), "busy", `Asking ${HOME.name} for its host key…`);
       const d = await http("GET", "/host");
       rc.parseKey(d.key, "ed25519");
       if (!Array.isArray(d.urls) || !d.urls.includes(BASE)) {
@@ -154,7 +154,7 @@ $("activate").addEventListener("click", () => {
         built = { r: await work("register", password, { key: d.key, url: BASE }, at, rc.KDF_DEFAULT), at };
       }
       const r = built.r;
-      status($("status2"), "busy", "Registering with rootcard.org…");
+      status($("status2"), "busy", `Registering with ${HOME.name}…`);
       await http("POST", "/id/register", { log: r.log, vault: r.vault, public: r.public });
       built = null;
       await work("forget");

@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="en">
 <head>
-<title>Operator and policy — rootcard.org</title>
-<meta name="description" content="Who runs rootcard.org, its host key, what it stores, and how to leave. rootcard.org is one public rootcard home among many.">
+<title>Operator and policy — {{home.name}}</title>
+<meta name="description" content="Who runs {{home.name}}, its host key, what it stores, and how to leave. {{home.name}} is one public rootcard home among many.">
 <!--#include head-->
 </head>
 <body data-page="policy">
@@ -11,7 +11,7 @@
   <div class="wrap page-head">
     <span class="eyebrow">Operator and policy</span>
     <h1>Who runs this home, and what it keeps.</h1>
-    <p>rootcard.org is one public home for rootcard identities. This page says who operates it, which key it signs with,
+    <p>{{home.name}} is one public home for rootcard identities. This page says who operates it, which key it signs with,
       what it stores and how to leave. It describes this home only, not the rootcard standard or other homes.</p>
   </div>
 
@@ -19,10 +19,10 @@
     <div>
       <section class="panel" id="operator">
         <h2>Operator</h2>
-        <p>rootcard.org is operated by <a class="mono" href="/card?h=Hexagon%23DNTT">Hexagon#DNTT</a>. That is a rootcard
+        <p>{{home.name}} is operated by <a class="mono" href="/card?h={{home.operator_query}}">{{home.operator}}</a>. That is a rootcard
           identity: its ID card is verified in your browser when you open it, and its public profile carries the
           operator's contact details.</p>
-        <p class="muted">The site runs the open-source <a href="https://github.com/rootcard/site">rootcard/site</a> with
+        <p class="muted">The site runs <a href="{{home.source}}">open-source software</a> built on
           <code>rootcard-host</code> {{rootcard_version}}.</p>
       </section>
 
@@ -52,7 +52,7 @@
       <section class="panel" id="terms">
         <h2>Service</h2>
         <ul class="muted">
-          <li>Free to use for the <code>global</code> realm. Usage is limited per network address and per identity; the
+          <li>Free to use for the <code>{{home.realm}}</code> realm. Usage is limited per network address and per identity; the
             limits are listed in <a href="/developers#api">this home's API</a>.</li>
           <li>rootcard is pre-1.0 and has not had an external security review. The service is offered as is, with no
             guarantee of availability. Keep your recovery card and an account file so you can move if this home goes
@@ -65,8 +65,8 @@
       <div class="panel">
         <h3>In short</h3>
         <dl class="kv">
-          <dt>Operator</dt><dd><a class="mono" href="/card?h=Hexagon%23DNTT">Hexagon#DNTT</a></dd>
-          <dt>Realm</dt><dd><code>global</code></dd>
+          <dt>Operator</dt><dd><a class="mono" href="/card?h={{home.operator_query}}">{{home.operator}}</a></dd>
+          <dt>Realm</dt><dd><code>{{home.realm}}</code></dd>
           <dt>Software</dt><dd>rootcard {{rootcard_version}}, open source</dd>
           <dt>Stores passwords</dt><dd>No</dd>
           <dt>Can reset passwords</dt><dd>No</dd>

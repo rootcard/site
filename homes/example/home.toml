@@ -1,0 +1,8 @@
+# An example of another home built from this repository: `ROOTCARD_HOME=homes/example/home.toml cargo build`.
+# Copy this directory, change the values, and put any page you want to replace into web/ next to this file.
+name = "id.example.com"
+url = "https://id.example.com"
+realm = "global"
+operator = "Operator#ABCD"
+source = "https://github.com/rootcard/site"
+overlay = "web"

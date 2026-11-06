@@ -1,0 +1,22 @@
+# This home: what the pages say about it, and the server's defaults. Read at build time by build.rs.
+#
+# rootcard.org's own values. To run your own home from this repository, edit this file (or point the build at another
+# one with ROOTCARD_HOME=path/to/home.toml) and rebuild. See README.md, "Run your own home", and homes/example.
+
+# The name the pages use for this home, in titles and text ("Create a card with <name> as home").
+name = "rootcard.org"
+# The canonical base URL: an origin, https:// (http:// only on loopback). The default of ROOTCARD_SITE_URLS, and the
+# address the developer pages show. The pages sign with the origin they are served from.
+url = "https://rootcard.org"
+# The realm the pages register and look up in. The default of ROOTCARD_SITE_REALMS.
+realm = "global"
+# The operator's rootcard handle: the policy page links to its verified ID card. Publish your contact details in its
+# public profile.
+operator = "Hexagon#DNTT"
+# The source of the site this home runs (linked from the footer and the policy page).
+source = "https://github.com/rootcard/site"
+# Optional: the wordmark in the header and footer, as HTML. Defaults to the name.
+wordmark_html = "root<b>card</b><span class=\"tld\">.org</span>"
+# Optional: a directory, relative to this file, whose files replace or add to web/ by path, including web/_partials
+# (for example a policy.html with your own terms, or img/logo.svg).
+# overlay = "web"

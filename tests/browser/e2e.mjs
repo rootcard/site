@@ -1,5 +1,5 @@
-// End-to-end test of the site in a real browser: register, sign in, profile, private data, export, proof, password
-// change, public lookup, plus screenshots. Run against a local server started with
+// End-to-end test of the site in a real browser: register, sign in, profile, private data, export, proofs, password
+// change, public lookup, proof verification on the card page, the host pointer, plus screenshots. Run against a local server started with
 // ROOTCARD_SITE_URLS=http://127.0.0.1:8080 (see README). Needs Playwright; not part of the binary.
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
@@ -77,6 +77,14 @@ const ok = await page.evaluate(async (t) => {
   return st.handle;
 }, proofText);
 step("proof verified for " + ok);
+// A public statement proof: signed here, shared as a link, checked and stamped on the card page.
+const statement = `I am ${user} on example.social, until 2099-12-31`;
+await page.fill("#recipient", "https://example.social");
+await page.fill("#challenge", JSON.stringify(statement));
+await page.click("#proveForm button[type=submit]");
+await page.waitForSelector("#openProof:not([hidden])");
+const proofLink = await page.getAttribute("#openProof", "href");
+const interactive = proofText;
 
 await page.click("[data-tab=password]");
 await page.fill("#newPassword", "another long passphrase 42");
@@ -104,10 +112,55 @@ await page.waitForSelector("#result:not([hidden])", { timeout: 20000 }).catch(as
 step("card lookup: " + (await page.textContent("#rAbout")));
 // The public half is never labelled "Recovery key", the name of the secret the key tool asks for ([PWR-6]).
 const factLabels = await page.$$eval("#rFacts dt", (ds) => ds.map((d) => d.textContent));
-if (factLabels.some((l) => /recovery key/i.test(l)) || !factLabels.includes("Root public key")) {
+if (factLabels.some((l) => /^recovery key$/i.test(l.trim())) || !factLabels.includes("Recovery public key")) {
   problems.push(`public key mislabelled on /card: ${factLabels.join(", ")}`);
 }
 await page.screenshot({ path: `${shots}/card.png` });
+
+// Proofs on the card page ([PRF-4]): the stamp says what was checked.
+const stampOf = async () => {
+  await page.waitForSelector("#card .ic-stamp", { timeout: 20000 });
+  return page.$eval("#card .ic-stamp", (e) => `${e.className} ${e.textContent}`);
+};
+await page.goto(proofLink);
+let stamp = await stampOf();
+if (!/\binfo\b/.test(stamp) || !(await page.textContent("#rProof")).includes(statement)) problems.push(`statement link: ${stamp}`);
+step("statement link: " + stamp);
+await page.screenshot({ path: `${shots}/card-statement.png` });
+await page.fill("#proofRecipient", "https://example.social");
+await page.click("#proofForm button[type=submit]");
+await page.waitForFunction(() => document.querySelector("#card .ic-stamp.ok"), null, { timeout: 20000 });
+step("statement for the named recipient: " + (await stampOf()));
+await page.goto(BASE + "/card");
+await page.fill("#proofText", interactive);
+await page.fill("#proofChallenge", "ab".repeat(32));
+await page.fill("#proofRecipient", "https://shop.example");
+await page.click("#proofForm button[type=submit]");
+stamp = await stampOf();
+if (!/\bok\b/.test(stamp)) problems.push(`interactive proof: ${stamp}`);
+step("interactive proof: " + stamp);
+await page.screenshot({ path: `${shots}/card-proof.png` });
+await page.fill("#proofRecipient", "https://other.example");
+await page.click("#proofForm button[type=submit]");
+await page.waitForFunction(() => document.querySelector("#card .ic-stamp.bad"), null, { timeout: 20000 });
+stamp = await stampOf();
+if (!stamp.includes("wrong_recipient")) problems.push(`forwarded proof: ${stamp}`);
+step("forwarded proof: " + stamp);
+await page.screenshot({ path: `${shots}/card-proof-bad.png` });
+await page.fill("#proofRecipient", "");
+await page.fill("#proofChallenge", "");
+await page.click("#proofForm button[type=submit]");
+await page.waitForFunction(() => document.querySelector("#card .ic-stamp.warn"), null, { timeout: 20000 });
+step("unchecked challenge: " + (await stampOf()));
+
+// The host pointer ([HST-23]) names this origin as the base URL.
+const pointer = await page.evaluate(async () => {
+  const rc = await import("/vendor/rootcard/src/index.js");
+  const res = await fetch(rc.WELL_KNOWN_PATH, { redirect: "manual" });
+  return rc.wellKnownBase(location.origin, rc.parseLimited(new Uint8Array(await res.arrayBuffer()), rc.WELL_KNOWN_LIMIT));
+});
+if (pointer !== BASE) problems.push(`host pointer: ${pointer}`);
+step("host pointer: " + pointer);
 for (const p of ["/developers", "/keytool", "/nope"]) {
   await page.goto(BASE + p);
   await page.screenshot({ path: `${shots}/${p.slice(1)}.png`, fullPage: true });

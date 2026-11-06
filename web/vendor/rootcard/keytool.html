@@ -382,7 +382,7 @@
 <script>
 "use strict";
 (() => {
-const ROOTCARD_VERSION = "0.3.1";
+const ROOTCARD_VERSION = "0.3.2";
 const __modules = {};
 __modules["errors.js"] = (() => {
 // Error codes (SPEC §20).
@@ -1727,6 +1727,8 @@ __modules["binding.js"] = (() => {
 // these let hosts, clients and the key tool agree on where endpoints live. Mirrors `rootcard::binding`.
 
 const { fail } = __modules["errors.js"];
+const { validate } = __modules["json.js"];
+const s = __modules["keys.js"];
 const { checkUrl } = __modules["log.js"];
 
 /**
@@ -1778,7 +1780,69 @@ function checkBaseUrl(url) {
   }
 }
 
-return { API_VERSION, isVersionSegment, checkBaseUrl };
+/**
+ * The well-known path of a host pointer ([HST-23], RFC 8615), at the root of an origin. It carries no API version: the
+ * pointer lists the versions the host serves.
+ */
+const WELL_KNOWN_PATH = "/.well-known/rootcard";
+
+/** The largest host pointer a client reads, in bytes ([HST-23]); pass it to `parseLimited`. */
+const WELL_KNOWN_LIMIT = 4096;
+
+/** The most API versions a host pointer may list ([HST-23]). */
+const MAX_WELL_KNOWN_APIS = 16;
+
+/**
+ * Whether a base URL ([HST-22]) is an origin: a base URL without a path. Only an origin is resolved through
+ * `WELL_KNOWN_PATH` ([HST-23]); an address with a path is already a base URL.
+ */
+function isOrigin(url) {
+  try {
+    checkBaseUrl(url);
+  } catch {
+    return false;
+  }
+  return !url.slice(url.indexOf("://") + 3).includes("/");
+}
+
+/**
+ * Resolve a host pointer ([HST-23]): the document served at `<origin>/.well-known/rootcard`, which names the host's base
+ * URL on that origin. `origin` is the address the client fetched it from, as the user typed it, never a value received.
+ * Checks, in order: `origin` is an origin → `bad_field`; the schema `{ v: 1, base, api }` → `bad_field`,
+ * `unsupported_version`; `base` is a base URL ([HST-22]) and `api` is 1 to 16 distinct API version segments →
+ * `bad_field`; `base` is on `origin` (the same scheme, host and port, the host compared without regard to ASCII case)
+ * → `wrong_host`; `api` lists `API_VERSION` → `unsupported_version`. Returns `base`, the address to use and to put into
+ * an instance's `home.url`.
+ */
+function wellKnownBase(origin, document) {
+  if (!isOrigin(origin)) fail("bad_field");
+  validate(document);
+  const m = s.object(document);
+  s.version(m);
+  s.members(m, ["v", "base", "api"]);
+  const base = s.string(m, "base");
+  checkBaseUrl(base);
+  const api = s.array(m, "api");
+  if (api.length === 0 || api.length > MAX_WELL_KNOWN_APIS) fail("bad_field");
+  const versions = [];
+  for (const v of api) {
+    if (typeof v !== "string" || !isVersionSegment(v) || versions.includes(v)) fail("bad_field");
+    versions.push(v);
+  }
+  const start = base.indexOf("://") + 3;
+  const slash = base.indexOf("/", start);
+  const baseOrigin = slash < 0 ? base : base.slice(0, slash);
+  if (!asciiEqualIgnoreCase(baseOrigin, origin)) fail("wrong_host");
+  if (!versions.includes(API_VERSION)) fail("unsupported_version");
+  return base;
+}
+
+function asciiEqualIgnoreCase(a, b) {
+  const lower = (x) => x.replace(/[A-Z]/g, (c) => c.toLowerCase());
+  return a.length === b.length && lower(a) === lower(b);
+}
+
+return { API_VERSION, isVersionSegment, checkBaseUrl, WELL_KNOWN_PATH, WELL_KNOWN_LIMIT, MAX_WELL_KNOWN_APIS, isOrigin, wellKnownBase };
 })();
 __modules["recovery.js"] = (() => {
 // The recovery key (SPEC §6).
@@ -3380,8 +3444,35 @@ async function http(method, url, body) {
   return value;
 }
 
-function hostList() {
-  return $("hosts").value.split(",").map((s) => s.trim()).filter(Boolean).map(checkHost);
+/**
+ * A typed host address made into the base URL to use ([HST-23]). An address with a path is a base URL already. For a
+ * bare origin (`https://example.com`) the host pointer at `<origin>/.well-known/rootcard` is asked first: a pointer
+ * names the host's base URL on that origin (`https://example.com/rootcard`), and without one (no answer, or not 200)
+ * the origin itself is the base URL. A pointer that does not resolve is an error, never a silent fallback.
+ */
+async function resolveHost(text) {
+  const typed = checkHost(text);
+  if (!rc.isOrigin(typed)) return typed;
+  const url = `${typed}${rc.WELL_KNOWN_PATH}`;
+  let res;
+  try {
+    res = await fetch(url, { credentials: "omit", referrerPolicy: "no-referrer", cache: "no-store", redirect: "error" });
+  } catch {
+    return typed;
+  }
+  if (res.status !== 200) return typed;
+  try {
+    return rc.wellKnownBase(typed, rc.parseLimited(new Uint8Array(await res.arrayBuffer()), rc.WELL_KNOWN_LIMIT));
+  } catch (e) {
+    throw new Error(`${url} does not point to a rootcard host on ${typed}: ${explain(e)}`);
+  }
+}
+
+async function hostList() {
+  const typed = $("hosts").value.split(",").map((s) => s.trim()).filter(Boolean);
+  const out = [];
+  for (const t of typed) out.push(await resolveHost(t));
+  return out;
 }
 
 /** [KT-2]: the newest log from the card, the account file and the hosts; a fork stops. */
@@ -3414,7 +3505,7 @@ async function gather() {
     vault = a.vault?.value;
     pub = a.public?.value;
   }
-  const hosts = hostList();
+  const hosts = await hostList();
   const st0 = await rc.verifyLog(log, opts);
   if (st0.instance) hosts.push(st0.instance.home.url);
   const notes = [];
@@ -3520,10 +3611,10 @@ async function challengeOf(text) {
 const ops = {
   async restore() {
     const { u } = await currentVault();
-    return submitInstance(checkHost($("targetHost").value), { restore: true }, u);
+    return submitInstance(await resolveHost($("targetHost").value), { restore: true }, u);
   },
   async fresh() {
-    return submitInstance(checkHost($("targetHost").value), { fresh: newSlot() }, undefined);
+    return submitInstance(await resolveHost($("targetHost").value), { fresh: newSlot() }, undefined);
   },
   async reset() {
     const { u } = await currentVault();
@@ -3780,7 +3871,7 @@ function watchHost(input) {
       return;
     }
     try {
-      const bases = typed.map(checkHost);
+      const bases = typed.map(checkHost).map((b) => (rc.isOrigin(b) ? `${b} (or the host its ${rc.WELL_KNOWN_PATH} names)` : b));
       hint.className = "hint good";
       hint.textContent = `✓ Will contact ${bases.join(", ")}`;
       input.removeAttribute("aria-invalid");
@@ -3858,8 +3949,9 @@ $("create").addEventListener("click", () =>
   run(async () => {
     const realm = $("nRealm").value.trim();
     const username = $("nUser").value.trim();
-    const base = createMode() === "host" ? checkHost($("nHost").value) : "";
-    if (base) rc.checkPassword($("nPassword").value, username);
+    if (createMode() === "host") checkHost($("nHost").value);
+    if (createMode() === "host") rc.checkPassword($("nPassword").value, username);
+    const base = createMode() === "host" ? await resolveHost($("nHost").value) : "";
     const rk = await rc.newRecoveryKey(realm, username, random); // usable in every browser ([CRY-9])
     let card;
     let file;

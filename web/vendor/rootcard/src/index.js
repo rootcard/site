@@ -7,7 +7,9 @@
 // Status: 0.x. Nothing here is stable before 1.0.0.
 
 export { FORMAT_VERSION, LABEL_PREFIX, label } from "./labels.js";
-export { API_VERSION, checkBaseUrl, isVersionSegment } from "./binding.js";
+export {
+  API_VERSION, WELL_KNOWN_PATH, WELL_KNOWN_LIMIT, MAX_WELL_KNOWN_APIS, checkBaseUrl, isOrigin, isVersionSegment, wellKnownBase,
+} from "./binding.js";
 export { ERROR_CODES, RootcardError } from "./errors.js";
 export { canonical, canonicalString, parseJson, parseLimited, validate } from "./json.js";
 export {

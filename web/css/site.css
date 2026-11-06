@@ -313,6 +313,39 @@ pre .s { color: #f3cf8a; }
 .ic-right { display: flex; align-items: center; gap: 2.2cqi; }
 .ic-verified { display: inline-flex; align-items: center; gap: 0.4em; font-size: 0.62em; font-weight: 750; letter-spacing: 0.1em; text-transform: uppercase; color: #8ff0c2; background: rgba(10, 40, 30, 0.35); border: 1px solid rgba(78, 211, 154, 0.45); border-radius: 999px; padding: 0.25em 0.7em; }
 .ic-verified .dot { width: 0.55em; height: 0.55em; box-shadow: none; }
+/* a proof's status, stamped on the card (card.html) */
+.idcard.proof-ok { box-shadow: 0 0 0 2px rgba(78, 211, 154, 0.75), 0 0 32px -6px rgba(78, 211, 154, 0.55), 0 40px 80px -30px rgba(0, 0, 0, 0.85); }
+.idcard.proof-info { box-shadow: 0 0 0 2px rgba(111, 208, 223, 0.7), 0 0 32px -6px rgba(111, 208, 223, 0.5), 0 40px 80px -30px rgba(0, 0, 0, 0.85); }
+.idcard.proof-warn { box-shadow: 0 0 0 2px rgba(242, 178, 92, 0.75), 0 0 32px -6px rgba(242, 178, 92, 0.5), 0 40px 80px -30px rgba(0, 0, 0, 0.85); }
+.idcard.proof-bad { box-shadow: 0 0 0 2px rgba(255, 122, 107, 0.8), 0 0 32px -6px rgba(255, 122, 107, 0.55), 0 40px 80px -30px rgba(0, 0, 0, 0.85); filter: saturate(0.55); }
+.ic-stamp {
+  --s: var(--ok);
+  position: absolute;
+  right: 5.5%;
+  top: 51%;
+  z-index: 1;
+  max-width: 58%;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.45em;
+  align-items: center;
+  padding: 0.45em 0.8em;
+  font-size: 3.3cqi;
+  line-height: 1.25;
+  color: var(--s);
+  background: rgba(6, 14, 18, 0.72);
+  border: 0.32em double var(--s);
+  border-radius: 0.6em;
+  transform: rotate(-4deg);
+  box-shadow: 0 0.4em 1.2em rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(3px);
+}
+.ic-stamp.info { --s: var(--teal-200); }
+.ic-stamp.warn { --s: var(--warn); }
+.ic-stamp.bad { --s: var(--danger); }
+.ic-stamp-icon { grid-row: span 2; font-size: 1.7em; font-weight: 900; line-height: 1; }
+.ic-stamp-title { font-weight: 850; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ic-stamp-detail { font-size: 0.72em; color: #e7eef4; opacity: 0.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .idcard .ic-key { font-family: var(--mono); font-size: 3.5cqi; letter-spacing: 0.05em; line-height: 1.55; word-spacing: 0.25em; color: #ffe2b8; }
 .card-stage { perspective: 1400px; max-width: 520px; margin: 0 auto 0.9rem; }
 .card-stage + p { margin-bottom: 1.25rem; }
@@ -445,3 +478,4 @@ th.us { color: var(--teal-200); }
 a.feature { color: inherit; display: block; } a.feature:hover { text-decoration: none; color: inherit; }
 .btn svg { flex: none; }
 .page-head .status-note { margin: 1.2rem 0 0; }
+.proof-statement { white-space: pre-wrap; word-break: break-word; font-size: 0.9rem; max-height: 14rem; overflow: auto; }
