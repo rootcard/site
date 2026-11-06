@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<title>Key tool — rootcard.org</title>
+<title>Key tool — {{home.name}}</title>
 <meta name="description" content="The rootcard key tool: reset a forgotten password, move to another home, rotate or retire, with your recovery card. A single HTML file you open from your own disk.">
 <!--#include head-->
 </head>
@@ -50,14 +50,14 @@
     </div>
     <aside class="sticky">
       <div class="panel">
-        <h3>Using it with rootcard.org</h3>
+        <h3>Using it with {{home.name}}</h3>
         <ol class="muted">
           <li>Open the saved <code>rootcard-keytool.html</code>.</li>
-          <li>Load your recovery card file (<code>.card.json</code>), or type the recovery key, realm <code>global</code> and
+          <li>Load your recovery card file (<code>.card.json</code>), or type the recovery key, realm <code>{{home.realm}}</code> and
             your username.</li>
-          <li>Enter <code>rootcard.org</code> as the host (the key tool adds <code>https://</code> and checks this
+          <li>Enter <code>{{home.host}}</code> as the host (the key tool adds <code>https://</code> and checks this
             home's <code>/.well-known/rootcard</code>).</li>
-          <li>Choose the operation. To move here from another home, enter <code>rootcard.org</code> as the target
+          <li>Choose the operation. To move here from another home, enter <code>{{home.host}}</code> as the target
             host.</li>
         </ol>
         <div class="notice warn"><p>Never type your recovery key into a website, this one included. A page a server

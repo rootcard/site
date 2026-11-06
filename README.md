@@ -1,6 +1,9 @@
-# rootcard.org
+# rootcard home site
 
-The website of [rootcard](https://github.com/rootcard/rootcard), and a public rootcard **home** for the `global` realm.
+A complete rootcard **home** in one Rust binary: the site people use (create a card, sign in, look up and verify, the
+key tool download) and the host behind it. It runs [rootcard.org](https://rootcard.org), the public home for the
+`global` realm of [rootcard](https://github.com/rootcard/rootcard), and it is a template for any other home: one file,
+`home.toml`, says which home a build is for (see [Run your own home](#run-your-own-home)).
 
 One Rust binary serves both:
 
@@ -30,13 +33,45 @@ unchanged, integrity checked against the registry). The server never sees a pass
 Every page is served with a strict CSP (`script-src 'self'`, no inline script or style, nothing third-party), `nosniff`,
 `no-referrer`, `frame-ancestors 'none'` and HSTS on https.
 
+## Run your own home
+
+Everything specific to a home is in `home.toml`, read at build time:
+
+| Key | rootcard.org | |
+|---|---|---|
+| `name` | `rootcard.org` | What the pages call this home |
+| `url` | `https://rootcard.org` | Its base URL, an origin. The default of `ROOTCARD_SITE_URLS` |
+| `realm` | `global` | The realm the pages register and look up in. The default of `ROOTCARD_SITE_REALMS` |
+| `operator` | `Hexagon#DNTT` | The operator's rootcard handle; the policy page links to its verified card |
+| `source` | this repository | The source of the site, linked from the footer and the policy page |
+| `wordmark_html` | `root<b>card</b>.org` | Optional: the wordmark in the header and footer (default: the name) |
+| `overlay` | – | Optional: a directory (relative to `home.toml`) whose files replace or add to `web/` by path, partials included: your own `policy.html` terms, `img/logo.svg`, `_partials/footer.html` |
+
+Either fork this repository and edit `home.toml`, or keep your home's files elsewhere and build with
+`ROOTCARD_HOME=path/to/home.toml` (`docker build --build-arg ROOTCARD_HOME=…`). `homes/example` is a complete example,
+built in CI, with an overlay that replaces `robots.txt`:
+
+```bash
+ROOTCARD_HOME=homes/example/home.toml cargo build --release
+```
+
+`build.rs` fills `{{home.*}}` in the pages (HTML-escaped), generates `/js/home-config.js` (the same values for the
+scripts) and `/site.webmanifest`, and fails on a placeholder it does not know. The pages say what *this* home stores and
+how to leave it, which holds for any home running this software unchanged; if you change the software or the storage,
+update `policy.html` (in your overlay) to match. Before opening a home to the public, publish contact details in the
+operator identity's public profile and keep the host key with the database backups. The binary serves the host at the
+root of its origin and answers the host pointer `/.well-known/rootcard` ([HST-23]) itself.
+
 ## Layout
 
 ```
 src/main.rs      axum server: routing, security headers, config, static assets
 src/store.rs     SQLite IdentityStore / ChallengeStore / SessionStore (schema of rootcard ARCHITECTURE.md §3.1)
 src/limits.rs    rate limits of HOST_PROTOCOL.md §6, per address and per identity
-build.rs         embeds web/ into the binary (partials, version and key tool hash substituted, ETags)
+build.rs         embeds web/ into the binary for the home of home.toml (overlay, partials, {{home.*}}, version and
+                 key tool hash substituted, home-config.js and webmanifest generated, ETags)
+home.toml        this build's home: rootcard.org
+homes/example    another home built from the same sources
 web/             pages, CSS, JS, logo; web/_partials are included into every page
 web/vendor/rootcard   the npm package rootcard@0.3.2 (src/, keytool.html, licenses)
 tests/browser    Playwright end-to-end test of the whole flow
@@ -51,16 +86,16 @@ ROOTCARD_SITE_URLS=http://127.0.0.1:8080 cargo run
 
 | Variable | Default | |
 |---|---|---|
-| `ROOTCARD_SITE_URLS` | `https://rootcard.org` | Base URLs of the host, comma separated, the first preferred. Origins only (the site serves the host at the root). `http://` only on loopback |
+| `ROOTCARD_SITE_URLS` | `url` of `home.toml` | Base URLs of the host, comma separated, the first preferred. Origins only (the site serves the host at the root). `http://` only on loopback |
 | `ROOTCARD_SITE_BIND` | `127.0.0.1:8080` | Listen address |
 | `ROOTCARD_SITE_DB` | `rootcard-site.db` | SQLite database |
 | `ROOTCARD_SITE_KEY_FILE` | `host.key` | Host key (64 hex), created with mode 0600 on first start. **Back it up with the database**: it signs the receipts of every instance homed here |
 | `ROOTCARD_SITE_SEED` | – | The host key as hex instead of a file |
 | `ROOTCARD_SITE_RETIRED_KEYS` | – | Public keys (hex) of earlier host keys, after a key rotation ([HST-17]) |
-| `ROOTCARD_SITE_REALMS` | `global` | Served realms |
+| `ROOTCARD_SITE_REALMS` | `realm` of `home.toml` | Served realms |
 | `ROOTCARD_SITE_TRUST_PROXY` | off | Take the client address from the last `X-Forwarded-For` entry (for rate limits) |
 
-Production: run behind a TLS-terminating reverse proxy (Caddy, nginx) on `https://rootcard.org` with
+Production: run behind a TLS-terminating reverse proxy (Caddy, nginx) on the home's URL with
 `ROOTCARD_SITE_TRUST_PROXY=1`, or use the `Dockerfile` (data in `/data`).
 
 ## Test

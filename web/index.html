@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="en">
 <head>
-<title>rootcard.org — a public home for rootcard identities</title>
-<meta name="description" content="rootcard.org is a public home for rootcard identities. rootcard is an open standard for logins you own: a username and password that no server can steal, reset or lock you out of, backed by a recovery card you keep.">
-<meta property="og:title" content="rootcard.org — a public home for rootcard identities">
+<title>{{home.name}} — a public home for rootcard identities</title>
+<meta name="description" content="{{home.name}} is a public home for rootcard identities. rootcard is an open standard for logins you own: a username and password that no server can steal, reset or lock you out of, backed by a recovery card you keep.">
+<meta property="og:title" content="{{home.name}} — a public home for rootcard identities">
 <meta property="og:description" content="Servers can check that you are you, but they can never become you, never learn your password, and never keep you from moving.">
 <meta property="og:type" content="website">
 <!--#include head-->
@@ -18,7 +18,7 @@
       <span class="eyebrow">A public rootcard home</span>
       <h1>A home for your rootcard ID.</h1>
       <p class="lead">rootcard is an open standard for logins you own: servers can check that you are you, but they can
-        never become you, never learn your password and never keep you from moving. rootcard.org is one of the homes
+        never become you, never learn your password and never keep you from moving. {{home.name}} is one of the homes
         that issue and hold rootcard identities, free to use and with nothing to install.</p>
       <div class="btn-row">
         <a class="btn btn-primary btn-lg" href="/create">Create a card</a>
@@ -44,10 +44,10 @@
       had an external security review. Use it to try things and for low-value accounts, not yet for anything you cannot
       afford to lose.</p></div>
     <div class="section-head">
-      <span class="eyebrow">What rootcard.org is</span>
+      <span class="eyebrow">What {{home.name}} is</span>
       <h2>One home among many.</h2>
       <p>A rootcard identity lives at a home: a server that keeps its public log and encrypted vault and lets you sign
-        in. rootcard.org is a public home for the <code>global</code> realm, run on the open-source
+        in. {{home.name}} is a public home for the <code>{{home.realm}}</code> realm, run on the open-source
         <code>rootcard-host</code>. It is not the rootcard project's central server, because there is none.
         <a href="/policy">Who runs it and what it keeps</a>.</p>
     </div>
@@ -69,8 +69,8 @@
       </div>
     </div>
     <div class="stat-row" id="stats" hidden>
-      <div class="stat"><b id="statCards">0</b><span>identities with rootcard.org as home</span></div>
-      <div class="stat"><b>global</b><span>realm served</span></div>
+      <div class="stat"><b id="statCards">0</b><span>identities with {{home.name}} as home</span></div>
+      <div class="stat"><b>{{home.realm}}</b><span>realm served</span></div>
       <div class="stat"><b>Ed25519 · Argon2id</b><span>standard cryptography</span></div>
     </div>
   </div>
@@ -86,7 +86,7 @@
       <div class="step"><h3>Create</h3><p>Pick a username and a password. Your browser makes the keys and a recovery
         card for you to download or print. Only then is the signed, encrypted registration sent here.</p></div>
       <div class="step"><h3>Sign in and prove</h3><p>Sign in here to edit your profile and private data, and make proofs
-        that any service can check against your public log, without asking rootcard.org.</p></div>
+        that any service can check against your public log, without asking {{home.name}}.</p></div>
       <div class="step"><h3>Keep the card</h3><p>The recovery card resets a forgotten password and moves you to another
         home with the <a href="/keytool">key tool</a>. Nobody else can do either for you.</p></div>
     </div>
@@ -104,8 +104,8 @@
     <div class="faq">
       <details><summary>What happens if I lose the recovery card?</summary>
         <p>The identity keeps working with your password, but it can no longer be reset or moved. If you then also forget
-          the password, the identity is gone. Nobody, rootcard.org included, can recover it: that is the point.</p></details>
-      <details><summary>What if rootcard.org disappears?</summary>
+          the password, the identity is gone. Nobody, {{home.name}} included, can recover it: that is the point.</p></details>
+      <details><summary>What if {{home.name}} disappears?</summary>
         <p>With the recovery card your id and handle survive on any other host. With the card and a downloaded account
           file, everything moves: private data, profile and passwords.</p></details>
       <details><summary>Why is the key tool a file I download?</summary>

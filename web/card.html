@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<title>Look up an ID card — rootcard.org</title>
+<title>Look up an ID card — {{home.name}}</title>
 <meta name="description" content="Look up a rootcard identity by its handle, or verify a proof, in your browser.">
 <!--#include head-->
 </head>
@@ -11,7 +11,7 @@
   <div class="wrap page-head">
     <span class="eyebrow">Look up an ID card</span>
     <h1>Check anyone's ID card yourself.</h1>
-    <p>Type the handle of an identity homed at rootcard.org, or paste a proof someone gave you. Your browser fetches
+    <p>Type the handle of an identity homed at {{home.name}}, or paste a proof someone gave you. Your browser fetches
       the public log and profile and verifies every signature itself: you do not have to trust this server's word.</p>
   </div>
   <div class="wrap app-grid">
@@ -29,7 +29,7 @@
       <form class="panel" id="proofForm" novalidate>
         <h2>Verify a proof</h2>
         <p class="muted">Someone sent you a proof that they control an identity, or published a signed statement. Paste
-          it here: your browser checks it against the identity's newest log, fetched from rootcard.org when it is homed
+          it here: your browser checks it against the identity's newest log, fetched from {{home.name}} when it is homed
           here, and stamps the result on the card.</p>
         <div class="field">
           <label for="proofText">Proof (JSON)</label>

@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="en">
 <head>
-<title>Developers — rootcard.org</title>
-<meta name="description" content="Integrate rootcard: verify users with proofs, run your own host with rootcard-host, or build clients with the zero-dependency npm package. rootcard.org is a public home with an open API.">
+<title>Developers — {{home.name}}</title>
+<meta name="description" content="Integrate rootcard: verify users with proofs, run your own host with rootcard-host, or build clients with the zero-dependency npm package. {{home.name}} is a public home with an open API.">
 <!--#include head-->
 </head>
 <body data-page="developers">
@@ -22,7 +22,7 @@
         with a fresh challenge and <code>verifyProof</code>. No central API.</p></a>
       <a class="feature" href="#host"><h3>Run your own host</h3><p>Give your service a standard username-and-password
         login with <code>rootcard-host</code>. No password hashes in your database.</p></a>
-      <a class="feature" href="#api"><h3>Use rootcard.org</h3><p>One public home for the <code>global</code> realm, with
+      <a class="feature" href="#api"><h3>Use {{home.name}}</h3><p>One public home for the <code>{{home.realm}}</code> realm, with
         the recommended HTTP binding and open CORS.</p></a>
     </div>
   </div>
@@ -36,7 +36,7 @@
           it with their account key (in their home's client) and sends you the proof and their log. Fetch the newest log
           from their home if you want to be sure it is current, then verify. Store at most the newest log per identity
           you deal with, and key your accounts by the account id: it never changes.</p>
-        <p class="muted">Signed-in users of rootcard.org can make proofs on their account page. A proof can also sign a
+        <p class="muted">Signed-in users of {{home.name}} can make proofs on their account page. A proof can also sign a
           public <em>statement</em> instead of your challenge ([PRF-5]): it is replayable by design, so it should say
           what it is for and until when. Anyone can check either kind in the browser on the
           <a href="/card">look-up page</a>, which stamps the result on the ID card; the account page gives statements
@@ -47,11 +47,11 @@
 <span class="c">// 1. challenge = crypto.getRandomValues(new Uint8Array(32))</span>
 <span class="c">// 2. the user returns { proof, log }</span>
 <span class="c">// 3. optionally fetch the newest log from the home:</span>
-<span class="c">//    GET https://rootcard.org/v0/id/{account}/log</span>
+<span class="c">//    GET {{home.url}}/v0/id/{account}/log</span>
 
 <span class="k">const</span> state = <span class="k">await</span> verifyProof(proof, log, challenge,
   <span class="s">"https://shop.example"</span>,
-  { realms: [<span class="s">"global"</span>], now: Math.floor(Date.now() / 1000) });
+  { realms: [<span class="s">"{{home.realm}}"</span>], now: Math.floor(Date.now() / 1000) });
 
 state.account   <span class="c">// the stable key for your user table</span>
 state.handle    <span class="c">// "Astra#3F9C", for display</span></pre>
@@ -67,7 +67,7 @@ state.handle    <span class="c">// "Astra#3F9C", for display</span></pre>
           storage and secrets to you. Implement three storage traits (identities with compare-and-swap, single-use
           challenges, sessions), pass your clock and random bytes, and wire <code>http::route</code> into any HTTP
           server.</p>
-        <p class="muted">This site is exactly that: an axum server with SQLite storage. <a href="https://github.com/rootcard/site">Its
+        <p class="muted">This site is exactly that: an axum server with SQLite storage. <a href="{{home.source}}">Its
           source</a> is a good starting point.</p>
         <ul class="muted">
           <li>Hosts never see a password and never run Argon2id.</li>
@@ -113,10 +113,10 @@ rootcard = { version = <span class="s">"{{rootcard_version}}"</span>, default-fe
       <pre><span class="k">import</span> { register } <span class="k">from</span> <span class="s">"rootcard/vault"</span>;
 <span class="k">import</span> { systemRandom, newRecoveryKey, KDF_DEFAULT } <span class="k">from</span> <span class="s">"rootcard"</span>;
 
-<span class="k">const</span> base = <span class="s">"https://rootcard.org"</span>;
+<span class="k">const</span> base = <span class="s">"{{home.url}}"</span>;
 <span class="k">const</span> d = <span class="k">await</span> (<span class="k">await</span> fetch(`${base}/v0/host`)).json();
-<span class="k">const</span> rk = <span class="k">await</span> newRecoveryKey(<span class="s">"global"</span>, <span class="s">"Astra"</span>, systemRandom);
-<span class="k">const</span> reg = <span class="k">await</span> register(rk, <span class="s">"global"</span>, <span class="s">"Astra"</span>, password,
+<span class="k">const</span> rk = <span class="k">await</span> newRecoveryKey(<span class="s">"{{home.realm}}"</span>, <span class="s">"Astra"</span>, systemRandom);
+<span class="k">const</span> reg = <span class="k">await</span> register(rk, <span class="s">"{{home.realm}}"</span>, <span class="s">"Astra"</span>, password,
   <span class="s">"Password"</span>, { key: d.key, url: base },
   Math.floor(Date.now() / 1000), KDF_DEFAULT, systemRandom);
 rk.fill(0);
@@ -132,19 +132,19 @@ rk.fill(0);
   <section id="api" class="band">
     <div class="wrap">
       <div class="section-head">
-        <span class="eyebrow">rootcard.org as a home</span>
+        <span class="eyebrow">{{home.name}} as a home</span>
         <h2>This home's API</h2>
-        <p>There is no central rootcard API: every home serves the same binding at its own base URL. rootcard.org serves
-          it for the <code>global</code> realm. Every endpoint below is
-          under <code>https://rootcard.org/v0</code>. The base URL that goes into logs and signed messages is
-          <code>https://rootcard.org</code>, without the version.</p>
+        <p>There is no central rootcard API: every home serves the same binding at its own base URL. {{home.name}} serves
+          it for the <code>{{home.realm}}</code> realm. Every endpoint below is
+          under <code>{{home.url}}/v0</code>. The base URL that goes into logs and signed messages is
+          <code>{{home.url}}</code>, without the version.</p>
       </div>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Endpoint</th><th>What</th><th>Limit per address</th></tr></thead>
           <tbody>
             <tr><td><code>GET /host</code></td><td>Host key, addresses and realms</td><td>120 / min</td></tr>
-            <tr><td><code>GET /id/lookup?realm=global&amp;handle=…</code></td><td>Resolve a handle to an account id and its home</td><td>120 / min</td></tr>
+            <tr><td><code>GET /id/lookup?realm={{home.realm}}&amp;handle=…</code></td><td>Resolve a handle to an account id and its home</td><td>120 / min</td></tr>
             <tr><td><code>GET /id/{account}/log</code></td><td>The newest log</td><td>120 / min</td></tr>
             <tr><td><code>GET /id/{account}/public</code></td><td>The signed public profile</td><td>120 / min</td></tr>
             <tr><td><code>POST /id/register</code></td><td>Register an identity with this home</td><td>3 / hour</td></tr>
@@ -160,8 +160,8 @@ rk.fill(0);
       </div>
       <p></p>
       <p class="muted">Outside <code>/v0</code>, at the root of the origin, the host pointer
-        <code>GET https://rootcard.org/.well-known/rootcard</code> ([HST-23]) answers
-        <code>{ "v": 1, "base": "https://rootcard.org", "api": ["v0"] }</code>, so clients given the bare domain
+        <code>GET {{home.url}}/.well-known/rootcard</code> ([HST-23]) answers
+        <code>{ "v": 1, "base": "{{home.url}}", "api": ["v0"] }</code>, so clients given the bare domain
         resolve it with <code>wellKnownBase</code>.</p>
       <p class="muted">Errors are JSON objects with the specification's codes (<code>{ "error": "not_home", … }</code>).
         CORS is open and no endpoint uses cookies. Full details: <a href="https://github.com/rootcard/rootcard/blob/main/docs/HOST_PROTOCOL.md">HOST_PROTOCOL.md</a>.</p>
@@ -192,7 +192,7 @@ rk.fill(0);
         <a class="btn" href="https://github.com/rootcard/rootcard/blob/main/docs/THREAT_MODEL.md">Threat model</a>
         <a class="btn" href="https://github.com/rootcard/rootcard/blob/main/docs/ARCHITECTURE.md">Architecture</a>
         <a class="btn btn-primary" href="https://github.com/rootcard/rootcard">rootcard on GitHub</a>
-        <a class="btn btn-ghost" href="https://github.com/rootcard/site">This site's source</a>
+        <a class="btn btn-ghost" href="{{home.source}}">This site's source</a>
       </div>
     </div>
   </section>

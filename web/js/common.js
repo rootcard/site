@@ -1,11 +1,12 @@
 // Shared helpers of the site's pages: talking to this home, explaining errors, rendering ID cards.
 
 import * as rc from "/vendor/rootcard/src/index.js";
+import { HOME } from "/js/home-config.js";
 
-export { rc };
+export { HOME, rc };
 
-/** The realm this home serves. */
-export const REALM = "global";
+/** The realm this home serves (home.toml). */
+export const REALM = HOME.realm;
 
 /**
  * The base URL of this home. The pages are served by the host itself, so the address the client signs is the origin
@@ -45,7 +46,7 @@ export async function http(method, path, body, token) {
       cache: "no-store",
     });
   } catch {
-    throw new Error("Could not reach rootcard.org. Check your connection and try again.");
+    throw new Error(`Could not reach ${HOME.name}. Check your connection and try again.`);
   }
   const text = await res.text();
   let value = null;

@@ -4,7 +4,7 @@
 //           verify the proof against the newest ([PRF-4]) and stamp the result on the card.
 // A proof link (`/card#proof=<base64url>`) carries the proof in the fragment, which is never sent to the server.
 
-import { REALM, busy, explain, groups, http, instanceTime, now, rc, renderCard, status, tilt } from "/js/common.js";
+import { HOME, REALM, busy, explain, groups, http, instanceTime, now, rc, renderCard, status, tilt } from "/js/common.js";
 
 const $ = (id) => document.getElementById(id);
 const card = $("card");
@@ -92,24 +92,24 @@ async function newestLog(account, sent) {
       sentState = await verify(sent);
     } catch (e) {
       if (!homeState) throw e;
-      notes.push(`The log sent with the proof does not verify (${e.code ?? "error"}); the log at rootcard.org was used.`);
+      notes.push(`The log sent with the proof does not verify (${e.code ?? "error"}); the log at ${HOME.name} was used.`);
     }
   }
   if (homeState && sentState) {
     const order = await rc.compareLogs(home, sent);
     if (order === "fork") throw new rc.RootcardError("fork");
     if (order === "newer") {
-      notes.push("The log sent with the proof is newer than the one at rootcard.org; the newer one was used.");
+      notes.push(`The log sent with the proof is newer than the one at ${HOME.name}; the newer one was used.`);
       return { log: sent, state: sentState, source: "sent", notes };
     }
     return { log: home, state: homeState, source: "home", notes };
   }
   if (homeState) return { log: home, state: homeState, source: "home", notes };
   if (sentState) {
-    notes.push("rootcard.org is not this identity's home, so the proof is only as fresh as the log sent with it.");
+    notes.push(`${HOME.name} is not this identity's home, so the proof is only as fresh as the log sent with it.`);
     return { log: sent, state: sentState, source: "sent", notes };
   }
-  throw new Error("This identity is not homed at rootcard.org, and no log came with the proof. Ask for the proof with its log.");
+  throw new Error(`This identity is not homed at ${HOME.name}, and no log came with the proof. Ask for the proof with its log.`);
 }
 
 /** Show a verified identity: the card, its facts and what this browser checked. `proof` is the proof's outcome, if any. */
@@ -267,7 +267,7 @@ async function checkProof(bundleText, challengeText, recipientText) {
       "Written by the owner. A statement proof can be shown again by anyone who has it, so check what it says it is for and until when."]);
   } else if (challengeChecked) facts.push(["Challenge", rc.hexEncode(challenge), true, "The challenge you entered."]);
   else facts.push(["Challenge", "not checked", false, "Enter the challenge you gave the prover, or the statement, to check it."]);
-  facts.push(["Log used", source === "home" ? "rootcard.org, the identity's home" : "sent with the proof", false, notes.join(" ") || undefined]);
+  facts.push(["Log used", source === "home" ? `${HOME.name}, the identity's home` : "sent with the proof", false, notes.join(" ") || undefined]);
 
   let stamp;
   let summary;

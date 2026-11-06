@@ -3,7 +3,7 @@ name = "rootcard-site"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.95"
-description = "rootcard.org: the product site and a public rootcard home host"
+description = "A rootcard home: the site and the host in one binary. rootcard.org runs it; home.toml makes it any home"
 license = "MIT OR Apache-2.0"
 publish = false
 
@@ -18,3 +18,4 @@ zeroize = "1"
 
 [build-dependencies]
 sha2 = "0.10"
+toml = "0.9"

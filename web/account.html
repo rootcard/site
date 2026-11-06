@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="en">
 <head>
-<title>Sign in — rootcard.org</title>
-<meta name="description" content="Sign in to your rootcard identity at rootcard.org. Your password unlocks your vault in this browser and is never sent.">
+<title>Sign in — {{home.name}}</title>
+<meta name="description" content="Sign in to your rootcard identity at {{home.name}}. Your password unlocks your vault in this browser and is never sent.">
 <!--#include head-->
 </head>
 <body data-page="account">
@@ -13,7 +13,7 @@
     <div class="wrap page-head">
       <span class="eyebrow">Sign in</span>
       <h1>Welcome back.</h1>
-      <p>Your password unlocks your vault here in the browser, which then signs rootcard.org's one-time challenge. The
+      <p>Your password unlocks your vault here in the browser, which then signs {{home.name}}'s one-time challenge. The
         password itself is never sent.</p>
     </div>
     <div class="wrap app-grid">
@@ -41,12 +41,12 @@
       </form>
       <aside class="panel">
         <h3>Forgot your password?</h3>
-        <p class="muted">Nobody can reset it for you, rootcard.org included: there is no e-mail reset to hijack. Reset it
+        <p class="muted">Nobody can reset it for you, {{home.name}} included: there is no e-mail reset to hijack. Reset it
           yourself with your recovery card in the <a href="/keytool">key tool</a>. Your id, your handle and your data
           stay.</p>
         <h3>Home somewhere else?</h3>
         <p class="muted">You sign in only at your identity's home. If your home is another server, sign in there; if you
-          want rootcard.org as your home, move with the key tool.</p>
+          want {{home.name}} as your home, move with the key tool.</p>
       </aside>
     </div>
   </div>
@@ -97,7 +97,7 @@
             <input id="pUrl" type="url" maxlength="200" placeholder="https://">
           </div>
           <h2>Private data</h2>
-          <p class="muted">Encrypted inside your vault. rootcard.org stores it but cannot read it.</p>
+          <p class="muted">Encrypted inside your vault. {{home.name}} stores it but cannot read it.</p>
           <div class="field">
             <label for="pNote">Private note <span class="hint">user.note</span></label>
             <textarea id="pNote" maxlength="4000"></textarea>
@@ -109,7 +109,7 @@
         <form class="panel" data-panel="password" hidden id="passwordForm" novalidate>
           <h2>Change password</h2>
           <p class="muted">The new password replaces the one you signed in with. The change is signed with the old
-            password, so rootcard.org can check it without ever seeing either.</p>
+            password, so {{home.name}} can check it without ever seeing either.</p>
           <div class="field">
             <label for="newPassword">New password</label>
             <input id="newPassword" type="password" autocomplete="new-password">

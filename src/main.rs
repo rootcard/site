@@ -1,9 +1,9 @@
-//! rootcard.org: the product site and a public rootcard home.
+//! A rootcard home: the site and the host in one binary. rootcard.org runs it; `home.toml` makes it any home.
 //!
-//! One binary serves the static site (embedded at build time from `web/`) and the rootcard host protocol under
-//! `<base URL>/v0` through `rootcard_host::http::route`, with SQLite storage and the recommended rate limits. The base
-//! URL is the site's origin (`https://rootcard.org`), so the pages it serves derive the address they sign from
-//! `location.origin` (HOST_PROTOCOL.md §1).
+//! One binary serves the static site (embedded at build time from `web/`, configured by `home.toml`) and the rootcard
+//! host protocol under `<base URL>/v0` through `rootcard_host::http::route`, with SQLite storage and the recommended rate
+//! limits. The base URL is the site's origin (`https://rootcard.org` for rootcard.org), so the pages it serves derive the
+//! address they sign from `location.origin` (HOST_PROTOCOL.md §1).
 #![forbid(unsafe_code)]
 
 mod limits;
@@ -40,6 +40,11 @@ use store::Db;
 use zeroize::Zeroizing;
 
 type SiteHost = Host<Db, Db, Db>;
+
+/// The home this binary was built for (`home.toml`, through build.rs): the defaults of `ROOTCARD_SITE_URLS` and
+/// `ROOTCARD_SITE_REALMS`.
+const HOME_URL: &str = env!("ROOTCARD_HOME_URL");
+const HOME_REALM: &str = env!("ROOTCARD_HOME_REALM");
 
 /// The path of the host pointer ([HST-23]), at the root of the origin.
 const WELL_KNOWN_PATH: &str = rootcard::WELL_KNOWN_PATH;
@@ -131,7 +136,7 @@ fn write_secret(path: &std::path::Path, text: &str) {
 
 fn config() -> HostConfig {
     let urls: Vec<String> = env("ROOTCARD_SITE_URLS")
-        .unwrap_or_else(|| "https://rootcard.org".into())
+        .unwrap_or_else(|| HOME_URL.into())
         .split(',')
         .map(|u| u.trim().trim_end_matches('/').to_string())
         .filter(|u| !u.is_empty())
@@ -145,7 +150,7 @@ fn config() -> HostConfig {
         }
     }
     let realms = env("ROOTCARD_SITE_REALMS")
-        .unwrap_or_else(|| "global".into())
+        .unwrap_or_else(|| HOME_REALM.into())
         .split(',')
         .map(|r| RealmConfig {
             realm: r.trim().to_string(),
@@ -510,6 +515,24 @@ mod tests {
         assert_eq!(asset_for("/create").map(|a| a.path), Some("/create.html"));
         assert!(asset_for("/_partials/header").is_none());
         assert!(asset_for("/../Cargo.toml").is_none());
+    }
+
+    #[test]
+    fn home_applied() {
+        // Every page is filled in for the home of this build: no placeholder is left, and the name appears.
+        for a in assets::ASSETS
+            .iter()
+            .filter(|a| a.path.ends_with(".html") && !a.path.starts_with("/vendor/"))
+        {
+            let text = std::str::from_utf8(a.body).expect("utf-8");
+            assert!(!text.contains("{{"), "{} has a placeholder left", a.path);
+        }
+        let index = std::str::from_utf8(assets::find("/index.html").expect("index").body).expect("utf-8");
+        assert!(index.contains(env!("ROOTCARD_HOME_NAME")));
+        let config =
+            std::str::from_utf8(assets::find("/js/home-config.js").expect("home-config.js").body).expect("utf-8");
+        assert!(config.contains(HOME_REALM) && config.contains(HOME_URL));
+        assert!(assets::find("/site.webmanifest").is_some());
     }
 
     #[test]

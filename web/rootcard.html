@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<title>About rootcard — rootcard.org</title>
+<title>About rootcard — {{home.name}}</title>
 <meta name="description" content="rootcard is an open standard for logins you own: a username and password backed by signatures, a recovery card you keep, and homes you can move between. How it works and how it compares.">
 <!--#include head-->
 </head>
@@ -12,7 +12,7 @@
     <span class="eyebrow">About rootcard</span>
     <h1>An open standard for logins you own.</h1>
     <p>rootcard is a specification with open-source libraries in Rust and JavaScript. It is not a company or a single
-      service: any server can be a home for rootcard identities, and rootcard.org is one of them. This page explains the
+      service: any server can be a home for rootcard identities, and {{home.name}} is one of them. This page explains the
       standard; the <a href="https://github.com/rootcard/rootcard/blob/main/spec/SPEC.md">specification</a> is the
       reference.</p>
   </div>
@@ -30,7 +30,7 @@
         it as a recovery card. Your id is the SHA-256 of a statement signed by that key, shown to people as
         <code>Astra#3F9C</code>.</p></div>
       <div class="step"><h3>Choose a home</h3><p>The recovery key signs an instance: a fresh account key and the server
-        that is your home. That can be rootcard.org, another public home or your own server.</p></div>
+        that is your home. That can be {{home.name}}, another public home or your own server.</p></div>
       <div class="step"><h3>Sign in</h3><p>Your device proves the password to fetch the vault, unlocks it locally and
         signs the home's one-time challenge. The password never leaves your device.</p></div>
       <div class="step"><h3>Prove</h3><p>Any service, on any server, can ask you to sign a challenge and check it against
@@ -95,10 +95,10 @@
       </div>
       <div class="panel">
         <h3>An ID card across websites</h3>
-        <p class="muted">Choose a home: rootcard.org, a host run by someone you trust, or your own. Any other service
+        <p class="muted">Choose a home: {{home.name}}, a host run by someone you trust, or your own. Any other service
           checks who you are by itself, from a fresh proof addressed to it. Your account there is keyed by your account
           id, which never changes, even when you move.</p>
-        <a href="/create">Create a card with rootcard.org as home →</a>
+        <a href="/create">Create a card with {{home.name}} as home →</a>
       </div>
     </div>
   </div>
@@ -150,7 +150,7 @@
 <span class="k">import</span> { verifyProof } <span class="k">from</span> <span class="s">"rootcard"</span>;
 
 <span class="k">const</span> state = <span class="k">await</span> verifyProof(proof, log, challenge,
-  <span class="s">"https://shop.example"</span>, { realms: [<span class="s">"global"</span>], now });
+  <span class="s">"https://shop.example"</span>, { realms: [<span class="s">"{{home.realm}}"</span>], now });
 
 console.log(state.handle);   <span class="c">// "Astra#3F9C"</span></pre>
   </div>
