@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <title>Look up an ID card — {{home.name}}</title>
-<meta name="description" content="Look up any rootcard ID card by its handle, or verify a proof someone gave you. Your browser checks every signature itself, without trusting the server.">
+<meta name="description" content="Look up any rootcard ID card by its handle, or check a proof someone gave you. Your browser checks every signature itself, without trusting the server.">
 <!--#include head-->
 </head>
 <body data-page="card">
@@ -11,10 +11,11 @@
   <div class="wrap page-head">
     <span class="eyebrow">Look up an ID card</span>
     <h1>Check anyone's ID card yourself.</h1>
-    <p>Type the handle of an identity homed at {{home.name}}, or paste a proof someone gave you. Your browser fetches
-      the public log and profile and verifies every signature itself: you do not have to trust this server's word.</p>
+    <p>Type the handle of an identity homed at {{home.name}}, or open a proof link someone gave you. Your browser
+      fetches the public log and profile and verifies every signature itself: you do not have to trust this server's
+      word.</p>
   </div>
-  <div class="wrap app-grid">
+  <div class="wrap app-grid card-page" id="grid">
     <div>
       <form class="panel" id="lookupForm" novalidate>
         <div class="field">
@@ -25,31 +26,6 @@
           </div>
         </div>
         <div class="status" id="lookupStatus" aria-live="polite"></div>
-      </form>
-      <form class="panel" id="proofForm" novalidate>
-        <h2>Verify a proof</h2>
-        <p class="muted">Someone sent you a proof that they control an identity, or published a signed statement. Paste
-          it here: your browser checks it against the identity's newest log, fetched from {{home.name}} when it is homed
-          here, and stamps the result on the card.</p>
-        <div class="field">
-          <label for="proofText">Proof (JSON)</label>
-          <textarea id="proofText" spellcheck="false" placeholder='{ "proof": { … }, "log": [ … ] } or a bare proof'></textarea>
-          <span class="hint">What the account page or the key tool gave out: the proof alone, or with the log and the statement.</span>
-        </div>
-        <div class="field">
-          <label for="proofChallenge">Statement (JSON) or challenge (64 hex)</label>
-          <textarea id="proofChallenge" spellcheck="false" placeholder='"I am Astra on example.social, until 2027-06-30"'></textarea>
-          <span class="hint">The challenge you gave the prover, or the statement the proof is said to sign. Empty: the
-            challenge is not checked.</span>
-        </div>
-        <div class="field">
-          <label for="proofRecipient">Recipient</label>
-          <input id="proofRecipient" type="text" autocapitalize="off" spellcheck="false" placeholder="https://shop.example">
-          <span class="hint">Who you are, as you asked the prover to name you. Empty: the proof is checked for the
-            recipient it names, and the card says so.</span>
-        </div>
-        <div class="btn-row"><button class="btn btn-primary" type="submit">Verify proof</button></div>
-        <div class="status" id="proofStatus" aria-live="polite"></div>
       </form>
       <section class="panel" id="result" hidden>
         <h2 id="rHandle"></h2>
@@ -64,9 +40,39 @@
         </div>
         <dl class="kv" id="rFacts"></dl>
         <hr>
+        <h3>Log</h3>
+        <ol class="log" id="rLog"></ol>
+        <hr>
         <h3>Checked in this browser</h3>
         <ul class="muted" id="rChecks"></ul>
       </section>
+      <details class="panel disclosure" id="proofBox">
+        <summary>Check a proof someone gave you</summary>
+        <form id="proofForm" novalidate>
+          <p class="muted">Paste a proof that someone controls an identity, or a signed statement. It is checked as you
+            paste, against the identity's newest log, and the result is stamped on the card.</p>
+          <div class="field">
+            <label for="proofText">Proof (JSON)</label>
+            <textarea id="proofText" spellcheck="false" placeholder='{ "proof": { … }, "log": [ … ] } or a bare proof'></textarea>
+          </div>
+          <details class="more" id="proofMore">
+            <summary>Your challenge and name (optional)</summary>
+            <div class="field">
+              <label for="proofChallenge">Statement (JSON) or challenge (64 hex)</label>
+              <textarea id="proofChallenge" spellcheck="false" placeholder='"I am Astra on example.social, until 2027-06-30"'></textarea>
+              <span class="hint">The challenge you gave the prover, or the statement the proof is said to sign. Empty:
+                the challenge is not checked.</span>
+            </div>
+            <div class="field">
+              <label for="proofRecipient">Recipient</label>
+              <input id="proofRecipient" type="text" autocapitalize="off" spellcheck="false" placeholder="https://shop.example">
+              <span class="hint">Who you are, as you asked the prover to name you. Empty: the proof is checked for the
+                recipient it names, and the card says so.</span>
+            </div>
+          </details>
+          <div class="status" id="proofStatus" aria-live="polite"></div>
+        </form>
+      </details>
     </div>
     <aside class="sticky">
       <div class="card-stage"><div id="card" class="idcard"></div></div>
