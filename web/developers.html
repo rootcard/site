@@ -103,7 +103,7 @@ rootcard = { version = <span class="s">"{{rootcard_version}}"</span>, default-fe
           verification core; <code>rootcard/vault</code> adds passwords, Argon2id and vault encryption. The flows are in
           the host protocol, §7. This site's pages are a complete client: registration, sign-in, profile and private
           data, password change and proofs.</p>
-        <div class="notice"><p>Generate the recovery key in the client, make the user save the card <em>before</em>
+        <div class="notice"><p>Generate the recovery key in the client, make the user save the recovery card <em>before</em>
           you send the registration, then erase it. Never ask for the recovery key in an application client.</p></div>
       </div>
       <pre><span class="k">import</span> { register } <span class="k">from</span> <span class="s">"rootcard/vault"</span>;
