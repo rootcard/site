@@ -4,7 +4,11 @@
 //! - HTML files get their `<!--#include name-->` directives replaced by `_partials/name.html`, `{{rootcard_version}}` /
 //!   `{{keytool_sha256}}` by the vendored package's version and the SHA-256 of its `keytool.html`, and `{{home.*}}` by
 //!   the home's values, HTML-escaped.
-//! - `/js/home-config.js` (the home's values for the scripts) and `/site.webmanifest` are generated.
+//! - `{{page.url}}`, `{{page.title}}` and `{{page.description}}` are the page's canonical URL (`/create.html` is
+//!   `<url>/create`), its `<title>` and its meta description, for the canonical link and the Open Graph tags.
+//! - `robots.txt` gets the `{{home.*}}` values too (for its `Sitemap:` line).
+//! - `/js/home-config.js` (the home's values for the scripts), `/site.webmanifest` and `/sitemap.xml` (every page
+//!   without `<meta name="robots" content="noindex">`) are generated.
 //! - `ROOTCARD_HOME_URL` and `ROOTCARD_HOME_REALM` are set for the server's defaults.
 //!
 //! Every asset gets a strong ETag (its SHA-256).
@@ -145,6 +149,31 @@ impl Home {
             .replace("{{home.operator_query}}", &percent_encode(&self.operator))
             .replace("{{home.source}}", &html_escape(&self.source))
             .replace("{{home.wordmark}}", &self.wordmark_html)
+            .replace("{{home.jsonld}}", &self.json_ld())
+    }
+
+    /// Structured data for the home page: the site and who publishes it, so search engines show its name and logo.
+    fn json_ld(&self) -> String {
+        format!(
+            "<script type=\"application/ld+json\">{{\"@context\":\"https://schema.org\",\"@graph\":[\
+             {{\"@type\":\"WebSite\",\"name\":{n},\"url\":{u}}},\
+             {{\"@type\":\"Organization\",\"name\":{n},\"url\":{u},\"logo\":{l},\"sameAs\":[{s}]}}]}}</script>",
+            n = json_string(&self.name),
+            u = json_string(&format!("{}/", self.url)),
+            l = json_string(&format!("{}/img/icon-512.png", self.url)),
+            s = json_string(&self.source)
+        )
+    }
+
+    /// The canonical URL of the page at `rel` (`index.html` is the root, `create.html` is `/create`).
+    fn page_url(&self, rel: &str) -> String {
+        let path = rel.strip_suffix(".html").unwrap_or(rel);
+        let path = if path == "index" {
+            ""
+        } else {
+            path.strip_suffix("/index").unwrap_or(path)
+        };
+        format!("{}/{path}", self.url)
     }
 
     fn config_js(&self) -> String {
@@ -162,10 +191,19 @@ impl Home {
     fn manifest(&self) -> String {
         format!(
             "{{\"name\":{n},\"short_name\":{n},\"start_url\":\"/\",\"display\":\"standalone\",\"background_color\":\"#0a0f14\",\
-             \"theme_color\":\"#0a0f14\",\"icons\":[{{\"src\":\"/img/logo.svg\",\"sizes\":\"any\",\"type\":\"image/svg+xml\"}}]}}\n",
+             \"theme_color\":\"#0a0f14\",\"icons\":[{{\"src\":\"/img/logo.svg\",\"sizes\":\"any\",\"type\":\"image/svg+xml\"}},\
+             {{\"src\":\"/img/icon-192.png\",\"sizes\":\"192x192\",\"type\":\"image/png\"}},\
+             {{\"src\":\"/img/icon-512.png\",\"sizes\":\"512x512\",\"type\":\"image/png\"}}]}}\n",
             n = json_string(&self.name)
         )
     }
+}
+
+/// The text between `open` and the next `close` in `text`.
+fn between<'a>(text: &'a str, open: &str, close: &str) -> Option<&'a str> {
+    let start = text.find(open)? + open.len();
+    let len = text[start..].find(close)?;
+    Some(&text[start..start + len])
 }
 
 fn mime(path: &str) -> &'static str {
@@ -177,6 +215,7 @@ fn mime(path: &str) -> &'static str {
         "png" => "image/png",
         "ico" => "image/x-icon",
         "json" | "webmanifest" => "application/json",
+        "xml" => "application/xml; charset=utf-8",
         "txt" => "text/plain; charset=utf-8",
         _ => "application/octet-stream",
     }
@@ -217,6 +256,7 @@ fn main() {
     };
 
     let mut assets: Vec<(String, Vec<u8>)> = Vec::new();
+    let mut sitemap = Vec::new();
     for (rel, f) in &files {
         if rel.starts_with("_partials/") {
             continue;
@@ -233,17 +273,50 @@ fn main() {
                 .substitute(&text)
                 .replace("{{rootcard_version}}", &version)
                 .replace("{{keytool_sha256}}", &keytool_sha);
+            let url = html_escape(&home.page_url(rel));
+            if text.contains("{{page.") {
+                // Already HTML-escaped text, used again in attribute values.
+                let title = between(&text, "<title>", "</title>")
+                    .unwrap_or_else(|| panic!("web/{rel}: no <title>"))
+                    .trim()
+                    .replace('"', "&quot;");
+                let description = between(&text, "<meta name=\"description\" content=\"", "\"")
+                    .unwrap_or_else(|| panic!("web/{rel}: no meta description"))
+                    .to_string();
+                text = text
+                    .replace("{{page.url}}", &url)
+                    .replace("{{page.title}}", &title)
+                    .replace("{{page.description}}", &description);
+            }
+            if !text.contains("<meta name=\"robots\" content=\"noindex") {
+                sitemap.push(url);
+            }
+            bytes = text.into_bytes();
+        } else if rel == "robots.txt" {
+            bytes = home
+                .substitute(&String::from_utf8(bytes).expect("utf-8 robots.txt"))
+                .into_bytes();
+        }
+        if (rel.ends_with(".html") && !rel.starts_with("vendor/")) || rel == "robots.txt" {
+            let text = String::from_utf8_lossy(&bytes);
             if let Some(i) = text.find("{{") {
                 let token: String = text[i..].chars().take(40).collect();
                 panic!("web/{rel}: unknown placeholder {token}");
             }
-            bytes = text.into_bytes();
         }
         assets.push((rel.clone(), bytes));
     }
+    let sitemap = sitemap.iter().fold(
+        String::from("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n"),
+        |mut s, u| {
+            let _ = writeln!(s, "  <url><loc>{u}</loc></url>");
+            s
+        },
+    ) + "</urlset>\n";
     for (rel, body) in [
         ("js/home-config.js", home.config_js()),
         ("site.webmanifest", home.manifest()),
+        ("sitemap.xml", sitemap),
     ] {
         if !files.contains_key(rel) {
             assets.push((rel.to_string(), body.into_bytes()));
