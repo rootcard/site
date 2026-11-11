@@ -8,8 +8,8 @@ license = "MIT OR Apache-2.0"
 publish = false
 
 [dependencies]
-rootcard = { version = "=0.3.2", default-features = false }
-rootcard-host = "=0.3.2"
+rootcard = { version = "=0.3.3", default-features = false }
+rootcard-host = "=0.3.3"
 axum = "0.8"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal"] }
 rusqlite = { version = "0.37", features = ["bundled"] }

@@ -382,7 +382,7 @@
 <script>
 "use strict";
 (() => {
-const ROOTCARD_VERSION = "0.3.2";
+const ROOTCARD_VERSION = "0.3.3";
 const __modules = {};
 __modules["errors.js"] = (() => {
 // Error codes (SPEC §20).
@@ -1338,7 +1338,7 @@ async function inception(keys, realm, username) {
 
 /** The tag of an account id ([HDL-1]). */
 function tag(account) {
-  return account.slice(0, 4);
+  return Array.from(account).slice(0, 4).join("");
 }
 
 /** `username + "#" + tag` ([HDL-1]). */
@@ -1389,15 +1389,20 @@ function handleMatches(parsed, username, account) {
 function extendedTags(ids) {
   const distinct = [...new Set(ids)];
   if (distinct.length < 2) return ids.map(tag);
-  const max = Math.min(...distinct.map((s) => s.length));
+  // Characters (code points), not UTF-16 units ([HDL-6]), as in the Rust core.
+  const chars = distinct.map((s) => Array.from(s));
+  const max = Math.min(...chars.map((c) => c.length));
   let n = 5;
   while (n < max) {
-    const prefixes = distinct.map((s) => s.slice(0, n));
+    const prefixes = chars.map((c) => c.slice(0, n).join(""));
     if (new Set(prefixes).size === prefixes.length) break;
     n++;
   }
   n = Math.min(n, max);
-  return ids.map((id) => `${id.slice(0, 4)}-${id.slice(4, n)}`);
+  return ids.map((id) => {
+    const c = Array.from(id);
+    return `${c.slice(0, 4).join("")}-${c.slice(4, n).join("")}`;
+  });
 }
 
 return { checkRealm, checkUsername, defaultUsernamePolicy, similarUsernames, accountId, inception, tag, handle, parseHandle, handleMatches, extendedTags };
@@ -2200,7 +2205,7 @@ __modules["messages.js"] = (() => {
 // Challenges and the signed messages of vault fetch, login and password change (SPEC §13).
 
 const { fail } = __modules["errors.js"];
-const { base64urlEncode } = __modules["encoding.js"];
+const { base64urlEncode, utf8 } = __modules["encoding.js"];
 const { ed25519Sign, ed25519Verify, frameObject } = __modules["crypto.js"];
 const s = __modules["keys.js"];
 const { label } = __modules["labels.js"];
@@ -2263,7 +2268,8 @@ function parseLoginRequest(v) {
   s.members(m, ["account", "nonce", "version", "url", "lock", "sig", "lock_sig"]);
   checkUrl(s.string(m, "url"));
   const lock = s.string(m, "lock");
-  if (lock.length < 1 || lock.length > 16) fail("bad_field");
+  // 1 to 16 bytes of UTF-8, as in the Rust core ([LGN-1] step 5), not UTF-16 units.
+  if (lock.length < 1 || utf8(lock).length > 16) fail("bad_field");
   s.account(m, "account");
   s.bytes(m, "nonce", 32);
   s.versionRef(s.get(m, "version"));

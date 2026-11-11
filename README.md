@@ -13,7 +13,7 @@ One Rust binary serves both:
   `rootcard_host::http::route`, with SQLite storage and the recommended rate limits. Anyone can get an ID card with
   rootcard.org as home from the browser, without running a server or the CLI.
 
-The browser does all the cryptography with the published npm package (`web/vendor/rootcard`, `rootcard@0.3.2`
+The browser does all the cryptography with the published npm package (`web/vendor/rootcard`, `rootcard@0.3.3`
 unchanged, integrity checked against the registry). The server never sees a password or a recovery key.
 
 ## What the pages do
@@ -77,7 +77,7 @@ build.rs         embeds web/ into the binary for the home of home.toml (overlay,
 home.toml        this build's home: rootcard.org
 homes/example    another home built from the same sources
 web/             pages, CSS, JS, logo; web/_partials are included into every page
-web/vendor/rootcard   the npm package rootcard@0.3.2 (src/, keytool.html, licenses)
+web/vendor/rootcard   the npm package rootcard@0.3.3 (src/, keytool.html, licenses)
 tests/browser    Playwright end-to-end test of the whole flow
 ```
 
