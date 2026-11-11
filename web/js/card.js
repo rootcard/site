@@ -142,9 +142,21 @@ async function homeLog(account) {
 
 /**
  * The newest valid log of `account` from this home's and the one sent with a proof ([VER-4]): `{ log, state, source,
- * notes }`. A fork is an error: the two cannot both be the owner's.
+ * current, notes }`. A fork is an error: the two cannot both be the owner's. `current` is whether the log is the one at
+ * the identity's own home, this one: only that log shows the newest state. A log sent with a proof is chosen by the
+ * prover, and this home's copy of an identity that moved elsewhere may be out of date; either can still name an account
+ * key that was replaced since.
  */
 async function newestLog(account, sent) {
+  const r = await pickLog(account, sent);
+  r.current = r.source === "home" && r.state.instance?.home.url === location.origin;
+  if (r.source === "home" && !r.current && r.state.instance) {
+    r.notes.push(`${HOME.name} keeps a copy of this log, but the identity's home is ${hostOf(r.state.instance.home.url)}: a newer log may be there.`);
+  }
+  return r;
+}
+
+async function pickLog(account, sent) {
   const notes = [];
   const home = await homeLog(account);
   let homeState = null;
@@ -309,7 +321,7 @@ async function checkProof(bundleText, challengeText, recipientText) {
   if (proof === null || typeof proof !== "object" || typeof proof.account !== "string" || !ACCOUNT.test(proof.account)) {
     throw new rc.RootcardError("bad_field");
   }
-  const { log, state, source, notes } = await newestLog(proof.account, b.log);
+  const { log, state, source, current, notes } = await newestLog(proof.account, b.log);
   const by = proof.by === "recovery" ? "recovery" : "account";
   const expected = await expectedChallenge(challengeText);
   const challengeChecked = expected !== null;
@@ -337,7 +349,8 @@ async function checkProof(bundleText, challengeText, recipientText) {
       "Written by the owner. A statement proof can be shown again by anyone who has it, so check what it says it is for and until when."]);
   } else if (challengeChecked) facts.push(["Challenge", rc.hexEncode(challenge), true, "The challenge you entered."]);
   else facts.push(["Challenge", "not checked", false, "Enter the challenge you gave the prover, or the statement, to check it."]);
-  facts.push(["Log used", source === "home" ? `${HOME.name}, the identity's home` : "sent with the proof", false, notes.join(" ") || undefined]);
+  const logUsed = source !== "home" ? "sent with the proof" : current ? `${HOME.name}, the identity's home` : `the copy at ${HOME.name}`;
+  facts.push(["Log used", logUsed, false, notes.join(" ") || undefined]);
 
   let stamp;
   let summary;
@@ -371,7 +384,19 @@ async function checkProof(bundleText, challengeText, recipientText) {
         ? `${state.handle} signed this statement for you.`
         : `${state.handle} controls this identity now: the proof answers your challenge and is addressed to you.`;
     }
-    note = by === "recovery" ? "Proven with the recovery key (root proof)." : "Proven with the current account key.";
+    if (!current) {
+      // Without the log of the identity's home, the key that signed may have been replaced since: say "valid", never
+      // "controls this identity now".
+      const stale = `The log used is not the one at the identity's home, so the ${by === "recovery" ? "recovery" : "account"} key may have been replaced since.`;
+      if (stamp.level === "ok") {
+        stamp = { level: "warn", title: "Signature valid", detail: "log may be out of date" };
+        summary = `${state.handle} signed this ${statement !== undefined ? "statement" : "proof"} for you with the key in the log used. ${stale}`;
+      } else summary = `${summary} ${stale}`;
+      checks.push(stale);
+    }
+    note = by === "recovery"
+      ? "Proven with the recovery key (root proof)."
+      : current ? "Proven with the current account key." : "Proven with the account key of the log used.";
   } catch (e) {
     stamp = { level: "bad", title: "Proof invalid", detail: e.code ?? "error" };
     summary = `This proof does not show that anyone controls ${state.handle}: ${explain(e)}`;
