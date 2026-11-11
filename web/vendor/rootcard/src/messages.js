@@ -1,7 +1,7 @@
 // Challenges and the signed messages of vault fetch, login and password change (SPEC §13).
 
 import { fail } from "./errors.js";
-import { base64urlEncode } from "./encoding.js";
+import { base64urlEncode, utf8 } from "./encoding.js";
 import { ed25519Sign, ed25519Verify, frameObject } from "./crypto.js";
 import * as s from "./keys.js";
 import { label } from "./labels.js";
@@ -64,7 +64,8 @@ export function parseLoginRequest(v) {
   s.members(m, ["account", "nonce", "version", "url", "lock", "sig", "lock_sig"]);
   checkUrl(s.string(m, "url"));
   const lock = s.string(m, "lock");
-  if (lock.length < 1 || lock.length > 16) fail("bad_field");
+  // 1 to 16 bytes of UTF-8, as in the Rust core ([LGN-1] step 5), not UTF-16 units.
+  if (lock.length < 1 || utf8(lock).length > 16) fail("bad_field");
   s.account(m, "account");
   s.bytes(m, "nonce", 32);
   s.versionRef(s.get(m, "version"));

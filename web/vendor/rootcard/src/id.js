@@ -44,7 +44,7 @@ export async function inception(keys, realm, username) {
 
 /** The tag of an account id ([HDL-1]). */
 export function tag(account) {
-  return account.slice(0, 4);
+  return Array.from(account).slice(0, 4).join("");
 }
 
 /** `username + "#" + tag` ([HDL-1]). */
@@ -95,13 +95,18 @@ export function handleMatches(parsed, username, account) {
 export function extendedTags(ids) {
   const distinct = [...new Set(ids)];
   if (distinct.length < 2) return ids.map(tag);
-  const max = Math.min(...distinct.map((s) => s.length));
+  // Characters (code points), not UTF-16 units ([HDL-6]), as in the Rust core.
+  const chars = distinct.map((s) => Array.from(s));
+  const max = Math.min(...chars.map((c) => c.length));
   let n = 5;
   while (n < max) {
-    const prefixes = distinct.map((s) => s.slice(0, n));
+    const prefixes = chars.map((c) => c.slice(0, n).join(""));
     if (new Set(prefixes).size === prefixes.length) break;
     n++;
   }
   n = Math.min(n, max);
-  return ids.map((id) => `${id.slice(0, 4)}-${id.slice(4, n)}`);
+  return ids.map((id) => {
+    const c = Array.from(id);
+    return `${c.slice(0, 4).join("")}-${c.slice(4, n).join("")}`;
+  });
 }
