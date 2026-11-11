@@ -73,7 +73,7 @@ const WHY = {
   weak_password: "The password is too weak: use at least 12 characters, and not your username.",
   bad_username: "Usernames are 3–20 letters, digits, - or _, starting with a letter.",
   username_policy: "Usernames are 3–20 letters, digits, - or _, starting with a letter.",
-  handle_taken: "That exact handle is taken. Try again: a new card gets a new tag.",
+  handle_taken: "That exact handle is taken. Start over: a new recovery card gets a new tag.",
   bad_handle: "That does not look like a handle. It is the name, a # and the 4-character tag, like Astra#3F9C.",
   unknown_account: "No identity with that handle is known here.",
   ambiguous_handle: "Several identities share that handle. Use the longer tag shown on the card.",

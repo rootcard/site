@@ -11,6 +11,7 @@ let reg = null; // { card, account, text }
 let done = null; // { state, log, public, vault }
 let cardSaved = false;
 let built = null; // { r, at }: a built registration, resent unchanged on a retry ([HST-20])
+let registered = null; // { account, public, vault }: accepted by the host; only the check of its log is left
 
 function showPreview(extra = {}) {
   const username = $("username").value.trim() || "you";
@@ -125,42 +126,59 @@ $("printCard").addEventListener("click", () => {
   cardSaved = true;
   updateActivate();
 });
-$("restart").addEventListener("click", async () => {
+async function startOver() {
   await work("forget");
   reg = null;
   built = null;
+  registered = null;
+  $("restart").hidden = false;
+  $("activate").textContent = "Activate my ID card";
   showPreview();
   $("previewNote").textContent = "A preview. The tag and the account id come from your key.";
   step(1);
-});
+}
+$("restart").addEventListener("click", () => startOver());
 
 $("activate").addEventListener("click", () => {
   const panel = $("step2");
   busy(panel, async () => {
     try {
-      const { password } = checkInputs();
-      status($("status2"), "busy", `Asking ${HOME.name} for its host key…`);
-      const d = await http("GET", "/host");
-      rc.parseKey(d.key, "ed25519");
-      if (!Array.isArray(d.urls) || !d.urls.includes(BASE)) {
-        throw new Error(`This page is served from ${BASE}, which is not one of the host's addresses.`);
+      if (!registered) {
+        const { password } = checkInputs();
+        status($("status2"), "busy", `Asking ${HOME.name} for its host key…`);
+        const d = await http("GET", "/host");
+        rc.parseKey(d.key, "ed25519");
+        if (!Array.isArray(d.urls) || !d.urls.includes(BASE)) {
+          throw new Error(`This page is served from ${BASE}, which is not one of the host's addresses.`);
+        }
+        if (!d.realms?.some((r) => r.realm === REALM)) throw new rc.RootcardError("realm_not_accepted");
+        // A retry resends exactly what was built, so a registration that arrived but whose answer was lost is
+        // recognized ([HST-20]). Only a stale build is rebuilt: the host receipts instances from the last 10 minutes.
+        if (!built || now() - built.at > 300) {
+          status($("status2"), "busy", "Sealing your vault with your password (Argon2id, 64 MiB). This takes a few seconds…");
+          const at = now();
+          built = { r: await work("register", password, { key: d.key, url: BASE }, at, rc.KDF_DEFAULT), at };
+        }
+        const r = built.r;
+        status($("status2"), "busy", `Registering with ${HOME.name}…`);
+        await http("POST", "/id/register", { log: r.log, vault: r.vault, public: r.public });
+        // From here on the identity exists: the recovery key is erased and the card the user saved is the only copy.
+        // Whatever fails next, this page must not offer to start over, which would make a second identity.
+        registered = { account: r.account, public: r.public, vault: r.vault };
+        built = null;
+        await work("forget");
+        $("restart").hidden = true;
+        $("activate").textContent = "Check my ID card again";
       }
-      if (!d.realms?.some((r) => r.realm === REALM)) throw new rc.RootcardError("realm_not_accepted");
-      // A retry resends exactly what was built, so a registration that arrived but whose answer was lost is
-      // recognized ([HST-20]). Only a stale build is rebuilt: the host receipts instances from the last 10 minutes.
-      if (!built || now() - built.at > 300) {
-        status($("status2"), "busy", "Sealing your vault with your password (Argon2id, 64 MiB). This takes a few seconds…");
-        const at = now();
-        built = { r: await work("register", password, { key: d.key, url: BASE }, at, rc.KDF_DEFAULT), at };
-      }
-      const r = built.r;
-      status($("status2"), "busy", `Registering with ${HOME.name}…`);
-      await http("POST", "/id/register", { log: r.log, vault: r.vault, public: r.public });
-      built = null;
-      await work("forget");
       status($("status2"), "busy", "Verifying your identity's log…");
-      const { log, state } = await fetchLog(r.account);
-      done = { log, state, public: r.public, vault: r.vault };
+      let fetched;
+      try {
+        fetched = await fetchLog(registered.account);
+      } catch (err) {
+        throw new Error(`Your identity is registered with ${HOME.name} and your recovery card is valid, but checking its log failed. ${explain(err)}`);
+      }
+      const { log, state } = fetched;
+      done = { log, state, public: registered.public, vault: registered.vault };
       $("password").value = "";
       $("password2").value = "";
       renderCard(preview, {
@@ -177,6 +195,13 @@ $("activate").addEventListener("click", () => {
       $("viewCard").href = `/card?h=${encodeURIComponent(state.handle)}`;
       step(3);
     } catch (err) {
+      if (err?.code === "handle_taken") {
+        // The tag comes from the recovery key, so only a new key gives a new handle. The saved card is for a key that
+        // was never registered.
+        await startOver();
+        status($("status1"), "error", "That exact handle is taken by another identity. Delete or shred the recovery card you just saved: it belongs to a key that was not registered. Create a new card to get a new tag.");
+        return;
+      }
       status($("status2"), "error", explain(err));
     }
   });
