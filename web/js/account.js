@@ -44,7 +44,9 @@ async function signIn(handleText, password, chosenLock) {
   const { log, state } = await fetchLog(found.account);
   if (!rc.handleMatches(parsed, state.username, state.account)) throw new rc.RootcardError("account_mismatch");
   if (!state.instance || state.instance.home.url !== BASE) throw new rc.RootcardError("not_home");
-  checkPassword(password, state.username);
+  // Not the password rules ([LCK-8]): a password set under other rules, or by another client, must still sign in, and a
+  // wrong password is reported as wrong, not as weak. The vault decides.
+  if (!password) throw new Error("Enter your password.");
 
   const hints = await http("GET", `/id/${state.account}/locks`);
   if (hints.instance !== state.instance.hash) throw new rc.RootcardError("stale_version");
@@ -123,6 +125,19 @@ function forget() {
   S = null;
 }
 
+/** Back to the sign-in form, with nothing of the signed-out identity left on screen. */
+function showSignedOut() {
+  $("signedIn").hidden = true;
+  $("signedOut").hidden = false;
+  $("lockField").hidden = true;
+  // Proofs of the signed-out identity stay valid, but are not left on screen for the next person.
+  for (const id of ["proofOut", "copyProof", "copyProofLink", "openProof", "proofLinkNote"]) $(id).hidden = true;
+  $("proofOut").textContent = "";
+  for (const id of ["pName", "pAbout", "pUrl", "pNote", "newPassword", "newPassword2", "recipient", "challenge"]) $(id).value = "";
+  $("facts").replaceChildren();
+  for (const id of ["overviewStatus", "profileStatus", "passwordStatus", "proveStatus"]) status($(id), "", "");
+}
+
 async function signOut() {
   const token = S?.token;
   forget();
@@ -131,20 +146,23 @@ async function signOut() {
       await http("POST", "/session/logout", undefined, token);
     } catch {}
   }
-  $("signedIn").hidden = true;
-  $("signedOut").hidden = false;
-  $("lockField").hidden = true;
-  // Proofs of the signed-out identity stay valid, but are not left on screen for the next person.
-  for (const id of ["proofOut", "copyProof", "copyProofLink", "openProof", "proofLinkNote"]) $(id).hidden = true;
-  $("proofOut").textContent = "";
+  showSignedOut();
 }
 
-// The unlocked vault cannot survive the page; end the session with it.
+// The unlocked vault cannot survive the page; end the session with it. The page may be kept in the back/forward cache
+// and shown again, so the keys are erased and the view reset here too, not only the session on the server.
 addEventListener("pagehide", () => {
   if (!S) return;
   fetch(`${BASE}/${rc.API_VERSION}/session/logout`, {
     method: "POST", headers: { Authorization: `Bearer ${S.token}` }, keepalive: true, credentials: "omit",
   }).catch(() => {});
+  forget();
+  showSignedOut();
+});
+
+// Leaving the page signs out: ask first, so a link does not end the session by surprise.
+addEventListener("beforeunload", (e) => {
+  if (S) e.preventDefault();
 });
 
 function fact(dl, k, v, mono) {
@@ -190,11 +208,36 @@ function show() {
   selectTab("overview");
 }
 
-function selectTab(name) {
-  for (const b of document.querySelectorAll("[data-tab]")) b.setAttribute("aria-selected", String(b.dataset.tab === name));
+const TABS = [...document.querySelectorAll("[data-tab]")];
+
+function selectTab(name, focus = false) {
+  for (const b of TABS) {
+    const on = b.dataset.tab === name;
+    b.setAttribute("aria-selected", String(on));
+    b.tabIndex = on ? 0 : -1;
+    if (on && focus) b.focus();
+  }
   for (const p of document.querySelectorAll("[data-panel]")) p.hidden = p.dataset.panel !== name;
 }
-for (const b of document.querySelectorAll("[data-tab]")) b.addEventListener("click", () => selectTab(b.dataset.tab));
+for (const b of TABS) {
+  const panel = document.querySelector(`[data-panel="${b.dataset.tab}"]`);
+  b.type = "button";
+  b.id = `tab-${b.dataset.tab}`;
+  panel.id ||= `panel-${b.dataset.tab}`;
+  b.setAttribute("aria-controls", panel.id);
+  panel.setAttribute("role", "tabpanel");
+  panel.setAttribute("aria-labelledby", b.id);
+  b.addEventListener("click", () => selectTab(b.dataset.tab));
+  // Arrow keys, Home and End move between the tabs (WAI-ARIA tabs pattern, automatic activation).
+  b.addEventListener("keydown", (e) => {
+    const i = TABS.indexOf(b);
+    const to = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: TABS.length - 1 }[e.key];
+    if (to === undefined) return;
+    e.preventDefault();
+    selectTab(TABS[(to + TABS.length) % TABS.length].dataset.tab, true);
+  });
+}
+selectTab("overview");
 
 $("signout").addEventListener("click", () => signOut());
 
