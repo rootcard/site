@@ -35,6 +35,7 @@ use rootcard_host::{Host, HostConfig, RealmConfig, UsernamePolicy};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use store::Db;
 use zeroize::Zeroizing;
@@ -55,6 +56,9 @@ struct App {
     limiter: Limiter,
     trust_proxy: bool,
     https: bool,
+    /// The number of identities homed here, for `/stats.json`: counted by the sweeper once a minute, so that the page
+    /// cannot make anyone hold the database lock for a table scan.
+    cards: AtomicI64,
 }
 
 /// The strict policy for every page the site serves: they handle passwords (rootcard THREAT_MODEL.md T19), so no inline
@@ -197,6 +201,7 @@ async fn main() {
         limiter: Limiter::default(),
         trust_proxy: env("ROOTCARD_SITE_TRUST_PROXY").is_some_and(|v| v == "1" || v == "true"),
         https,
+        cards: AtomicI64::new(-1),
     });
 
     let sweeper = app.clone();
@@ -211,6 +216,10 @@ async fn main() {
                     eprintln!("rootcard-site: sweep: {e}");
                 }
                 a.limiter.sweep(t);
+                match a.db.count() {
+                    Ok(n) => a.cards.store(n, Ordering::Relaxed),
+                    Err(e) => eprintln!("rootcard-site: count: {e}"),
+                }
             })
             .await;
         }
@@ -251,8 +260,20 @@ fn is_api(path: &str) -> bool {
     first.len() >= 2 && first.starts_with('v') && first[1..].bytes().all(|b| b.is_ascii_digit())
 }
 
+/// Whether `ip` is an address a reverse proxy of this site connects from: loopback, private or link-local. A client on
+/// the public internet that reaches the site directly cannot choose its address with `X-Forwarded-For`.
+fn is_proxy_address(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(v4) => v4.is_loopback() || v4.is_private() || v4.is_link_local(),
+        std::net::IpAddr::V6(v6) => match v6.to_ipv4_mapped() {
+            Some(v4) => is_proxy_address(v4.into()),
+            None => v6.is_loopback() || v6.is_unique_local() || v6.is_unicast_link_local(),
+        },
+    }
+}
+
 fn client_address(app: &App, peer: SocketAddr, headers: &HeaderMap) -> String {
-    if app.trust_proxy {
+    if app.trust_proxy && is_proxy_address(peer.ip()) {
         // The reverse proxy appends the address it saw; the last entry is the only one it vouches for.
         if let Some(last) = headers
             .get("x-forwarded-for")
@@ -362,6 +383,9 @@ async fn api(app: &Arc<App>, peer: SocketAddr, req: axum::extract::Request) -> R
     let Ok(out) = tokio::task::spawn_blocking(move || route(&a.host, &host_req, now(), &mut random)).await else {
         return json_error(500, "internal");
     };
+    if !(200..300).contains(&out.status) {
+        app.limiter.failed(&class, account, now());
+    }
     host_response(out)
 }
 
@@ -449,10 +473,15 @@ async fn site(app: &Arc<App>, method: &Method, path: &str, query: Option<&str>, 
         return r;
     }
     if path == "/stats.json" {
-        let a = app.clone();
-        let count = tokio::task::spawn_blocking(move || a.db.count().unwrap_or(0))
-            .await
-            .unwrap_or(0);
+        let mut count = app.cards.load(Ordering::Relaxed);
+        if count < 0 {
+            // Before the sweeper's first count (its first tick is at start-up): count once.
+            let a = app.clone();
+            count = tokio::task::spawn_blocking(move || a.db.count().unwrap_or(0))
+                .await
+                .unwrap_or(0);
+            app.cards.store(count, Ordering::Relaxed);
+        }
         let mut r = Response::new(Body::from(format!("{{\"cards\":{count}}}")));
         let h = r.headers_mut();
         h.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json"));
@@ -587,6 +616,25 @@ mod tests {
             std::str::from_utf8(assets::find("/js/home-config.js").expect("home-config.js").body).expect("utf-8");
         assert!(config.contains(HOME_REALM) && config.contains(HOME_URL));
         assert!(assets::find("/site.webmanifest").is_some());
+    }
+
+    #[test]
+    fn proxy_addresses() {
+        for ip in [
+            "127.0.0.1",
+            "10.1.2.3",
+            "172.17.0.1",
+            "192.168.1.1",
+            "::1",
+            "fd00::1",
+            "fe80::1",
+            "::ffff:10.0.0.1",
+        ] {
+            assert!(is_proxy_address(ip.parse().expect("ip")), "{ip}");
+        }
+        for ip in ["203.0.113.7", "2001:db8::1", "::ffff:203.0.113.7"] {
+            assert!(!is_proxy_address(ip.parse().expect("ip")), "{ip}");
+        }
     }
 
     #[test]

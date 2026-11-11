@@ -141,24 +141,26 @@ rk.fill(0);
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Endpoint</th><th>What</th><th>Limit per address</th></tr></thead>
+          <thead><tr><th>Endpoint</th><th>What</th><th>Limit per address</th><th>Failed requests per identity</th></tr></thead>
           <tbody>
-            <tr><td><code>GET /host</code></td><td>Host key, addresses and realms</td><td>120 / min</td></tr>
-            <tr><td><code>GET /id/lookup?realm={{home.realm}}&amp;handle=…</code></td><td>Resolve a handle to an account id and its home</td><td>120 / min</td></tr>
-            <tr><td><code>GET /id/{account}/log</code></td><td>The newest log</td><td>120 / min</td></tr>
-            <tr><td><code>GET /id/{account}/public</code></td><td>The signed public profile</td><td>120 / min</td></tr>
-            <tr><td><code>POST /id/register</code></td><td>Register an identity with this home</td><td>3 / hour</td></tr>
-            <tr><td><code>POST /id/{account}/events</code></td><td>Newer events (rotation, retirement)</td><td>30 / hour</td></tr>
-            <tr><td><code>POST /id/{account}/instance</code></td><td>Move here or reset (key tool)</td><td>30 / hour</td></tr>
-            <tr><td><code>GET /id/{account}/locks</code></td><td>Lock hints for sign-in</td><td>30 / hour</td></tr>
-            <tr><td><code>POST /id/{account}/challenge</code></td><td>A single-use challenge (60 s)</td><td>10 / min</td></tr>
-            <tr><td><code>POST /id/{account}/fetch</code></td><td>The vault, after a lock proof</td><td>30 / hour, 10 / hour per identity</td></tr>
-            <tr><td><code>POST /id/{account}/login</code></td><td>Sign in; returns a bearer token</td><td>10 / min</td></tr>
-            <tr><td><code>/session/*</code></td><td>Vault, profile, password change, export, logout</td><td>120 / min</td></tr>
+            <tr><td><code>GET /host</code></td><td>Host key, addresses and realms</td><td>120 / min</td><td>–</td></tr>
+            <tr><td><code>GET /id/lookup?realm={{home.realm}}&amp;handle=…</code></td><td>Resolve a handle to an account id and its home</td><td>120 / min</td><td>–</td></tr>
+            <tr><td><code>GET /id/{account}/log</code></td><td>The newest log</td><td>120 / min</td><td>–</td></tr>
+            <tr><td><code>GET /id/{account}/public</code></td><td>The signed public profile</td><td>120 / min</td><td>–</td></tr>
+            <tr><td><code>POST /id/register</code></td><td>Register an identity with this home</td><td>3 / hour</td><td>–</td></tr>
+            <tr><td><code>POST /id/{account}/events</code></td><td>Newer events (rotation, retirement)</td><td>30 / hour</td><td>–</td></tr>
+            <tr><td><code>POST /id/{account}/instance</code></td><td>Move here or reset (key tool)</td><td>30 / hour</td><td>–</td></tr>
+            <tr><td><code>GET /id/{account}/locks</code></td><td>Lock hints for sign-in</td><td>30 / hour</td><td>30 / hour</td></tr>
+            <tr><td><code>POST /id/{account}/challenge</code></td><td>A single-use challenge (60 s)</td><td>10 / min</td><td>30 / hour</td></tr>
+            <tr><td><code>POST /id/{account}/fetch</code></td><td>The vault, after a lock proof</td><td>30 / hour</td><td>10 / hour</td></tr>
+            <tr><td><code>POST /id/{account}/login</code></td><td>Sign in; returns a bearer token</td><td>10 / min</td><td>30 / hour</td></tr>
+            <tr><td><code>/session/*</code></td><td>Vault, profile, password change, export, logout</td><td>120 / min; password change 10 / hour</td><td>–</td></tr>
           </tbody>
         </table>
       </div>
-      <p></p>
+      <p class="muted">IPv6 addresses are limited per /64. Only failed requests count against an identity, so requests
+        anyone can make, such as reading the lock hints, cannot use up its owner's sign-in budget. Failed fetches, which are
+        password guesses, still can: that is the trade-off HOST_PROTOCOL.md §6 describes.</p>
       <p class="muted">Outside <code>/v0</code>, at the root of the origin, the host pointer
         <code>GET {{home.url}}/.well-known/rootcard</code> ([HST-23]) answers
         <code>{ "v": 1, "base": "{{home.url}}", "api": ["v0"] }</code>, so clients given the bare domain
