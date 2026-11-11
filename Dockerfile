@@ -15,6 +15,8 @@ ENV ROOTCARD_SITE_BIND=0.0.0.0:8080 \
     ROOTCARD_SITE_DB=/data/rootcard-site.db \
     ROOTCARD_SITE_KEY_FILE=/data/host.key \
     ROOTCARD_SITE_TRUST_PROXY=1
+# ROOTCARD_SITE_TRUST_PROXY=1: run behind a reverse proxy that appends the client address to X-Forwarded-For. The header
+# is only taken from loopback and private addresses, but publish the port to the proxy alone, not to the internet.
 VOLUME /data
 EXPOSE 8080
 CMD ["rootcard-site"]

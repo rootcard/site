@@ -71,7 +71,7 @@ root of its origin and answers the host pointer `/.well-known/rootcard` ([HST-23
 ```
 src/main.rs      axum server: routing, security headers, config, static assets
 src/store.rs     SQLite IdentityStore / ChallengeStore / SessionStore (schema of rootcard ARCHITECTURE.md §3.1)
-src/limits.rs    rate limits of HOST_PROTOCOL.md §6, per address and per identity
+src/limits.rs    rate limits of HOST_PROTOCOL.md §6, per address (IPv6 per /64) and, for failed requests, per identity
 build.rs         embeds web/ into the binary for the home of home.toml (overlay, partials, {{home.*}}, version and
                  key tool hash substituted, home-config.js, webmanifest and sitemap generated, ETags)
 home.toml        this build's home: rootcard.org
@@ -97,7 +97,7 @@ ROOTCARD_SITE_URLS=http://127.0.0.1:8080 cargo run
 | `ROOTCARD_SITE_SEED` | – | The host key as hex instead of a file |
 | `ROOTCARD_SITE_RETIRED_KEYS` | – | Public keys (hex) of earlier host keys, after a key rotation ([HST-17]) |
 | `ROOTCARD_SITE_REALMS` | `realm` of `home.toml` | Served realms |
-| `ROOTCARD_SITE_TRUST_PROXY` | off | Take the client address from the last `X-Forwarded-For` entry (for rate limits) |
+| `ROOTCARD_SITE_TRUST_PROXY` | off (on in the `Dockerfile`) | Take the client address from the last `X-Forwarded-For` entry (for rate limits), when the connection comes from a loopback or private address (the reverse proxy) |
 
 Production: run behind a TLS-terminating reverse proxy (Caddy, nginx) on the home's URL with
 `ROOTCARD_SITE_TRUST_PROXY=1`, or use the `Dockerfile` (data in `/data`).

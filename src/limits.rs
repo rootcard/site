@@ -1,7 +1,15 @@
 //! Rate limits for the host endpoints, following rootcard's HOST_PROTOCOL.md §6. Fixed windows per network address and,
 //! where the protocol recommends it, per identity. In memory: the site runs as one process.
+//!
+//! Every request counts against its address. Only failed requests count against the identity they name: §6 asks hosts to
+//! count failed fetches (online password guesses) separately, and warns that limits per identity let an attacker delay
+//! the owner (AR8). Counting every request would let anyone lock an owner out of signing in with 30 `GET …/locks`.
+//!
+//! IPv6 addresses are limited per /64, the block one subscriber usually gets: per address, one subscriber would have
+//! 2^64 of them.
 
 use std::collections::HashMap;
+use std::net::IpAddr;
 use std::sync::Mutex;
 
 /// A limit: at most `count` requests per `window` seconds.
@@ -26,8 +34,35 @@ pub struct Class {
     pub identity: Option<Limit>,
 }
 
+/// Whether `a` has the form of an account id (52 digits and upper-case letters). Only those are counted per
+/// identity, so arbitrary path segments cannot fill the limiter's memory.
+fn is_account(a: &str) -> bool {
+    a.len() == 52 && a.bytes().all(|b| b.is_ascii_digit() || b.is_ascii_uppercase())
+}
+
+/// The key an address is limited by: the address itself, or its /64 for IPv6 (an IPv4 address mapped into IPv6 is the
+/// IPv4 address). Text that is not an address is used as it is.
+pub fn address_key(address: &str) -> String {
+    match address.parse::<IpAddr>() {
+        Ok(IpAddr::V6(v6)) => match v6.to_ipv4_mapped() {
+            Some(v4) => v4.to_string(),
+            None => {
+                let s = v6.segments();
+                format!("{:x}:{:x}:{:x}:{:x}::/64", s[0], s[1], s[2], s[3])
+            }
+        },
+        Ok(IpAddr::V4(v4)) => v4.to_string(),
+        Err(_) => address.to_string(),
+    }
+}
+
 /// The class of a request (method and path relative to the API root, without the query), and the account it names.
 pub fn classify<'a>(method: &str, path: &'a str) -> (Class, Option<&'a str>) {
+    let (class, account) = classify_path(method, path);
+    (class, account.filter(|a| is_account(a)))
+}
+
+fn classify_path<'a>(method: &str, path: &'a str) -> (Class, Option<&'a str>) {
     let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
     let c = |name, address, identity| Class {
         name,
@@ -60,13 +95,16 @@ type Windows = HashMap<(&'static str, String), (i64, u32)>;
 pub struct Limiter(Mutex<Windows>);
 
 impl Limiter {
-    /// Count a request. Returns `Err(retry_after)` if a limit is exceeded.
+    /// Count a request against its address, and check that the identity it names has failures left. Returns
+    /// `Err(retry_after)` if a limit is exceeded. Report the outcome with [`Limiter::failed`].
     pub fn check(&self, class: &Class, address: &str, account: Option<&str>, now: i64) -> Result<(), i64> {
         let Ok(mut map) = self.0.lock() else {
             return Ok(());
         };
-        let mut hit = |key: String, limit: Limit| -> Result<(), i64> {
-            let e = map.entry((class.name, key)).or_insert((now, 0));
+        if let Some(limit) = class.address {
+            let e = map
+                .entry((class.name, format!("a:{}", address_key(address))))
+                .or_insert((now, 0));
             if now - e.0 >= limit.window {
                 *e = (now, 0);
             }
@@ -74,15 +112,30 @@ impl Limiter {
                 return Err((e.0 + limit.window - now).max(1));
             }
             e.1 += 1;
-            Ok(())
-        };
-        if let Some(l) = class.address {
-            hit(format!("a:{address}"), l)?;
         }
-        if let (Some(l), Some(a)) = (class.identity, account) {
-            hit(format!("i:{a}"), l)?;
+        if let (Some(limit), Some(a)) = (class.identity, account)
+            && let Some(e) = map.get(&(class.name, format!("i:{a}")))
+            && now - e.0 < limit.window
+            && e.1 >= limit.count
+        {
+            return Err((e.0 + limit.window - now).max(1));
         }
         Ok(())
+    }
+
+    /// Count a failed request against the identity it names.
+    pub fn failed(&self, class: &Class, account: Option<&str>, now: i64) {
+        let (Some(limit), Some(a)) = (class.identity, account) else {
+            return;
+        };
+        let Ok(mut map) = self.0.lock() else {
+            return;
+        };
+        let e = map.entry((class.name, format!("i:{a}"))).or_insert((now, 0));
+        if now - e.0 >= limit.window {
+            *e = (now, 0);
+        }
+        e.1 = e.1.saturating_add(1);
     }
 
     /// Drop windows that have ended (called periodically).
@@ -97,11 +150,17 @@ impl Limiter {
 mod tests {
     use super::*;
 
+    const ACCT: &str = "3F9CQ7M2K8XH4T1VZ6RBNW0J5PDGA9SE3YC7KFM2HQ8T4V1XZ6RB";
+
     #[test]
     fn classes() {
         assert_eq!(classify("POST", "/id/register").0.name, "register");
-        let (c, a) = classify("POST", "/id/ABCD/fetch");
-        assert_eq!((c.name, a), ("fetch", Some("ABCD")));
+        let path = format!("/id/{ACCT}/fetch");
+        let (c, a) = classify("POST", &path);
+        assert_eq!((c.name, a), ("fetch", Some(ACCT)));
+        // Anything else in the place of the account is not counted per identity.
+        assert_eq!(classify("POST", "/id/ABCD/fetch").1, None);
+        assert_eq!(classify("GET", &format!("/id/{}/locks", ACCT.to_lowercase())).1, None);
         assert_eq!(classify("GET", "/session/vault").0.name, "session");
         assert_eq!(classify("OPTIONS", "/id/register").0.name, "options");
     }
@@ -119,12 +178,45 @@ mod tests {
     }
 
     #[test]
-    fn per_identity() {
+    fn per_identity_counts_failures_only() {
         let l = Limiter::default();
-        let (c, a) = classify("POST", "/id/ACCT/fetch");
-        for i in 0..10 {
+        let path = format!("/id/{ACCT}/fetch");
+        let (c, a) = classify("POST", &path);
+        // Successful requests from many addresses leave the identity's budget alone.
+        for i in 0..20 {
             assert!(l.check(&c, &format!("10.0.0.{i}"), a, 0).is_ok());
         }
-        assert!(l.check(&c, "10.0.1.1", a, 0).is_err());
+        for i in 0..10 {
+            assert!(l.check(&c, &format!("10.0.1.{i}"), a, 0).is_ok());
+            l.failed(&c, a, 0);
+        }
+        assert_eq!(l.check(&c, "10.0.2.1", a, 10), Err(3590));
+        assert!(l.check(&c, "10.0.2.1", a, 3600).is_ok());
+    }
+
+    #[test]
+    fn locks_cannot_lock_out_the_owner() {
+        let l = Limiter::default();
+        let path = format!("/id/{ACCT}/locks");
+        let (c, a) = classify("GET", &path);
+        for i in 0..30 {
+            assert!(l.check(&c, &format!("10.0.0.{i}"), a, 0).is_ok());
+        }
+        assert!(l.check(&c, "192.0.2.1", a, 0).is_ok());
+    }
+
+    #[test]
+    fn ipv6_per_64() {
+        assert_eq!(address_key("2001:db8:1:2:3:4:5:6"), "2001:db8:1:2::/64");
+        assert_eq!(address_key("2001:db8:1:2:ffff::1"), "2001:db8:1:2::/64");
+        assert_eq!(address_key("::ffff:192.0.2.1"), "192.0.2.1");
+        assert_eq!(address_key("192.0.2.1"), "192.0.2.1");
+        let l = Limiter::default();
+        let (c, _) = classify("POST", "/id/register");
+        for i in 0..3 {
+            assert!(l.check(&c, &format!("2001:db8::{i}"), None, 0).is_ok());
+        }
+        assert!(l.check(&c, "2001:db8::ffff", None, 0).is_err());
+        assert!(l.check(&c, "2001:db8:0:1::1", None, 0).is_ok());
     }
 }
