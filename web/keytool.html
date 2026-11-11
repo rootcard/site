@@ -31,8 +31,11 @@
           <dt>SHA-256</dt><dd class="mono">{{keytool_sha256}}</dd>
         </dl>
         <p class="hint">Check the hash before you type a recovery key: <code>sha256sum rootcard-keytool.html</code>
-          (Linux), <code>shasum -a 256</code> (macOS) or <code>Get-FileHash</code> (Windows). Or take the file straight
-          from the npm package: <code>npm pack rootcard@{{rootcard_version}}</code>.</p>
+          (Linux), <code>shasum -a 256</code> (macOS) or <code>Get-FileHash</code> (Windows).</p>
+        <p class="hint">This hash comes from the same server as the file, so it only shows that the download is intact.
+          To check that it is the published file, compare it with the npm package, which this server cannot change:
+          <code>npm pack rootcard@{{rootcard_version}}</code>, then hash <code>package/keytool.html</code> from the
+          archive. Or use that file instead.</p>
       </section>
       <section class="panel">
         <h2>What it does</h2>

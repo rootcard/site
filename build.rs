@@ -264,7 +264,13 @@ fn main() {
         let mut bytes = fs::read(f).expect("read asset");
         if rel.ends_with(".html") && !rel.starts_with("vendor/") {
             let mut text = String::from_utf8(bytes).expect("utf-8 html");
+            // Partials may include partials; a partial that includes itself, directly or not, would never end.
+            let mut expansions = 0;
             while let Some(start) = text.find("<!--#include ") {
+                expansions += 1;
+                if expansions > 100 {
+                    panic!("web/{rel}: more than 100 includes; does a partial include itself?");
+                }
                 let end = start + text[start..].find("-->").expect("unterminated include") + 3;
                 let name = text[start + 13..end - 3].trim().to_string();
                 text.replace_range(start..end, partial(&name).trim_end());
