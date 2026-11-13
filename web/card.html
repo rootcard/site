@@ -39,6 +39,16 @@
           <hr>
         </div>
         <dl class="kv" id="rFacts"></dl>
+        <div id="rLinks" hidden>
+          <hr>
+          <h3>Linked accounts</h3>
+          <p class="muted">Accounts elsewhere that the owner lists as theirs. A link counts only once your browser finds
+            the owner's token there, where only that account's owner can write. Checking asks the service directly,
+            from your browser: <span id="rLinksHosts"></span>.</p>
+          <div id="rLinksNote"></div>
+          <ul class="links" id="rLinksList"></ul>
+          <div class="btn-row" id="rLinksRow"><button class="btn" type="button" id="rLinksCheck">Check all links</button></div>
+        </div>
         <hr>
         <h3>Log</h3>
         <ol class="log" id="rLog"></ol>

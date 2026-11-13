@@ -6,6 +6,7 @@ import { BASE, REALM, busy, download, explain, fetchLog, groups, http, instanceT
 import { checkPassword, checkContents, unwrapVaultKey, updateContents } from "/vendor/rootcard/src/vault.js";
 import { aesGcmDecrypt, ed25519Public } from "/vendor/rootcard/src/crypto.js";
 import { CONTENTS_LIMIT, contentsAad } from "/vendor/rootcard/src/vaultcheck.js";
+import { REGISTRY, SERVICES, check, contacts, githubUser, help, renderLinks, serviceLabel, statusOf, whereToken } from "/js/links.js";
 
 const $ = (id) => document.getElementById(id);
 let S = null; // { token, state, log, vault, u, lock, authSeed, public, publicData }
@@ -133,9 +134,15 @@ function showSignedOut() {
   // Proofs of the signed-out identity stay valid, but are not left on screen for the next person.
   for (const id of ["proofOut", "copyProof", "copyProofLink", "openProof", "proofLinkNote"]) $(id).hidden = true;
   $("proofOut").textContent = "";
-  for (const id of ["pName", "pAbout", "pUrl", "pNote", "newPassword", "newPassword2", "recipient", "challenge"]) $(id).value = "";
+  for (const id of ["pName", "pAbout", "pUrl", "pNote", "newPassword", "newPassword2", "recipient", "challenge", "lName", "lUid", "lValue"]) $(id).value = "";
   $("facts").replaceChildren();
-  for (const id of ["overviewStatus", "profileStatus", "passwordStatus", "proveStatus"]) status($(id), "", "");
+  $("linksList").replaceChildren();
+  $("linksNote").replaceChildren();
+  $("token").textContent = "";
+  linkOutcomes.clear();
+  pending = null;
+  $("lConfirm").hidden = true;
+  for (const id of ["overviewStatus", "profileStatus", "linksStatus", "passwordStatus", "proveStatus"]) status($(id), "", "");
 }
 
 async function signOut() {
@@ -205,6 +212,9 @@ function show() {
   $("pUrl").value = typeof d["user.url"] === "string" ? d["user.url"] : "";
   const note = S.u.contents.data["user.note"];
   $("pNote").value = typeof note === "string" ? note : "";
+  $("token").textContent = rc.linkToken(state.account);
+  $("linksCard").href = `/card?h=${encodeURIComponent(state.handle)}`;
+  showLinks();
   selectTab("overview");
 }
 
@@ -262,6 +272,15 @@ function setText(data, key, value) {
   return d;
 }
 
+/** Sign and publish a new public profile with `data` ([DAT-3]: the next rev of this instance). */
+async function publishProfile(data) {
+  const rev = (S.public ? S.public.rev : 0) + 1;
+  const pub = await rc.signPublic(S.state.account, S.state.instance.hash, rev, data, S.u.contents.accountSeed);
+  await http("PUT", "/session/public", { public: pub }, S.token);
+  S.public = pub;
+  S.publicData = data;
+}
+
 $("profileForm").addEventListener("submit", (e) => {
   e.preventDefault();
   busy($("profileForm"), async () => {
@@ -275,11 +294,7 @@ $("profileForm").addEventListener("submit", (e) => {
       data = setText(data, "user.url", url);
       if (rc.canonicalString(data) !== rc.canonicalString(S.publicData)) {
         status(st, "busy", "Signing and saving your public profile…");
-        const rev = (S.public ? S.public.rev : 0) + 1;
-        const pub = await rc.signPublic(S.state.account, S.state.instance.hash, rev, data, S.u.contents.accountSeed);
-        await http("PUT", "/session/public", { public: pub }, S.token);
-        S.public = pub;
-        S.publicData = data;
+        await publishProfile(data);
       }
       const note = $("pNote").value;
       const privateData = setText(S.u.contents.data, "user.note", note);
@@ -295,6 +310,265 @@ $("profileForm").addEventListener("submit", (e) => {
       show();
       selectTab("profile");
       status($("profileStatus"), "ok", "Saved.");
+    } catch (err) {
+      status(st, "error", explain(err));
+    }
+  });
+});
+
+// ---- linked accounts (SPEC §12.3) ----
+// The links are the public profile key `user.links`. Adding one checks it from this browser first ([LNK-4]), then shows
+// the service, the name and that the link is public before it is published.
+
+/** The application namespace this site writes under ([DAT-7]); links themselves are a `user.` key. */
+const APP = "site";
+const linkKey = (link) => rc.canonicalString(link);
+const linkOutcomes = new Map(); // canonical link → the last check in this browser
+let pending = null; // { link, links }: checked, waiting for "Publish"
+
+/** parseLinks of the current profile, or [] with a note when the value as a whole cannot be read. */
+function linkEntries() {
+  try {
+    return { entries: rc.parseLinks(S.publicData, REGISTRY), note: "" };
+  } catch (e) {
+    const note = e?.code === "unsupported"
+      ? "Your profile lists linked accounts in a newer format than this site reads. Adding or removing a link here replaces that list."
+      : "Your profile's list of linked accounts is malformed. Adding or removing a link here replaces it.";
+    return { entries: [], note };
+  }
+}
+
+/** The links a new list keeps: those this site can read. The others are dropped, and the user is told before. */
+function kept(entries) {
+  return entries.filter((e) => e.status === "ok").map((e) => e.link);
+}
+
+function dropped(entries, note) {
+  const n = entries.filter((e) => e.status !== "ok").length;
+  if (note) return " The list your profile has now is replaced.";
+  return n ? ` ${n === 1 ? "One link" : `${n} links`} this site cannot read (shown above) ${n === 1 ? "is" : "are"} left out.` : "";
+}
+
+function showLinks() {
+  const { entries, note } = linkEntries();
+  $("linksNote").replaceChildren();
+  if (note) {
+    const n = document.createElement("div");
+    n.className = "notice warn";
+    const p = document.createElement("p");
+    p.textContent = note;
+    n.append(p);
+    $("linksNote").append(n);
+  }
+  $("linksEmpty").hidden = entries.length > 0;
+  renderLinks($("linksList"), entries, { get: (e) => (e.link ? linkOutcomes.get(linkKey(e.link)) : undefined) }, {
+    owner: true,
+    onCheck: (i) => checkExisting(entries[i]),
+    onRemove: (i) => removeLink(entries, i),
+  });
+}
+
+function checkExisting(entry) {
+  return busy($("linksForm"), async () => {
+    const st = $("linksStatus");
+    try {
+      status(st, "busy", `Checking from this browser (contacts ${contacts(entry.link).join(", ")})…`);
+      const outcome = await check(entry.link, S.state.account);
+      if (!S) return;
+      linkOutcomes.set(linkKey(entry.link), outcome);
+      showLinks();
+      const s = statusOf(entry, outcome);
+      const where = outcome.result === "verified" ? "" : ` ${whereToken(entry.link)}`;
+      status(st, s.level === "bad" ? "error" : s.level || "info", `${serviceLabel(entry.link.service)} · ${entry.link.name}: ${s.text}${where}`);
+    } catch (err) {
+      status(st, "error", explain(err));
+    }
+  });
+}
+
+async function removeLink(entries, i) {
+  const st = $("linksStatus");
+  const entry = entries[i];
+  const what = entry.link ? `${serviceLabel(entry.link.service)} · ${entry.link.name}` : "this invalid link";
+  if (!confirm(`Remove ${what} from your public profile?`)) return;
+  await busy($("linksForm"), async () => {
+    try {
+      const { entries: now, note } = linkEntries();
+      const rest = kept(now).filter((l) => !entry.link || linkKey(l) !== linkKey(entry.link));
+      const data = rest.length
+        ? rc.setData(S.publicData, APP, rc.LINKS_KEY, rc.linksValue(rest, REGISTRY))
+        : rc.removeData(S.publicData, APP, rc.LINKS_KEY);
+      status(st, "busy", "Signing and saving your public profile…");
+      await publishProfile(data);
+      showLinks();
+      // [LNK-4]: older copies of the profile still list the link; only removing the token ends it.
+      status(st, "ok", entry.link
+        ? `Removed. Remove the token too: ${whereToken(entry.link)} Older copies of your profile still list the link, and the token is what makes it count.${dropped(now, note)}`
+        : `Removed.${dropped(now, note)}`);
+    } catch (err) {
+      status(st, "error", explain(err));
+    }
+  });
+}
+
+/** The descriptor of the chosen service. */
+const chosen = () => rc.findDescriptor(REGISTRY, $("lService").value);
+
+/** The link the form describes, as typed (not yet checked against the service's rules). */
+function formLink() {
+  const d = chosen();
+  const link = { service: d.service, name: $("lName").value.trim() };
+  if (d.uid) link.uid = $("lUid").value.trim();
+  const form = $("lForm").value;
+  if (d.forms.length && form) {
+    const f = d.forms.find(([n]) => n === form);
+    link.ref = f && f[1].kind !== "none" ? `${form}:${$("lValue").value.trim()}` : form;
+  }
+  return link;
+}
+
+/** Labels and fields for the chosen service and form. */
+function linkFormChanged() {
+  const d = chosen();
+  const h = help(d.service);
+  $("lNameLabel").textContent = h.name ?? "Name";
+  $("lNameHint").textContent = h.nameHint ?? "";
+  $("lName").placeholder = d.name.kind === "domain" ? "example.com" : "";
+  $("lUidField").hidden = !d.uid;
+  $("lUidLabel").textContent = h.uid ?? "Account id";
+  $("lUidHint").textContent = h.uidHint ?? "";
+  const forms = d.forms.map(([n]) => n);
+  $("lFormField").hidden = forms.length === 0;
+  const keep = $("lForm").value;
+  const options = forms.map((n) => new Option(h.forms?.[n]?.label ?? n, n));
+  if (d.checks.some(([k]) => k === "*") && forms.length) options.unshift(new Option("The service's usual place", ""));
+  $("lForm").replaceChildren(...options);
+  if (forms.includes(keep)) $("lForm").value = keep;
+  const form = d.forms.find(([n]) => n === $("lForm").value);
+  $("lValueField").hidden = !form || form[1].kind === "none";
+  const fh = form ? h.forms?.[form[0]] : undefined;
+  $("lValueLabel").textContent = fh?.value ?? "Reference";
+  $("lValueHint").textContent = fh?.valueHint ?? "";
+  $("lWhere").textContent = whereToken(formLink());
+  pending = null;
+  $("lConfirm").hidden = true;
+}
+
+$("lService").replaceChildren(...SERVICES.map((d) => new Option(serviceLabel(d.service), d.service)));
+$("lService").addEventListener("change", () => {
+  $("lName").value = "";
+  $("lUid").value = "";
+  $("lValue").value = "";
+  linkFormChanged();
+});
+$("lForm").addEventListener("change", linkFormChanged);
+$("lName").addEventListener("input", () => {
+  // A uid filled in for another name is not this name's.
+  if ($("lUid").dataset.auto === "1") {
+    $("lUid").value = "";
+    $("lUid").dataset.auto = "";
+  }
+  linkFormChanged();
+});
+$("lUid").addEventListener("input", () => {
+  $("lUid").dataset.auto = "";
+  linkFormChanged();
+});
+$("lValue").addEventListener("input", linkFormChanged);
+linkFormChanged();
+
+$("copyToken").addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText($("token").textContent);
+    status($("linksStatus"), "ok", "Token copied.");
+  } catch {
+    status($("linksStatus"), "warn", "Copy failed; select the token instead.");
+  }
+});
+
+$("linksForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  busy($("linksForm"), async () => {
+    const st = $("linksStatus");
+    pending = null;
+    $("lConfirm").hidden = true;
+    try {
+      const d = chosen();
+      let link = formLink();
+      if (!link.name) throw new Error(`Enter the ${(help(d.service).name ?? "name").toLowerCase()}.`);
+      if (d.service === "github" && !link.uid) {
+        // GitHub links name the stable user id too ([LNK-18]): ask GitHub for it, as the check will.
+        status(st, "busy", "Asking GitHub for the account's user id (contacts api.github.com)…");
+        const u = await githubUser(link.name);
+        if (!u) throw new Error("GitHub does not know that username, or did not answer. Check it, or enter the user id yourself.");
+        $("lName").value = u.name;
+        $("lUid").value = u.uid;
+        $("lUid").dataset.auto = "1";
+        link = formLink();
+      }
+      try {
+        rc.linksValue([link], REGISTRY);
+      } catch (err) {
+        throw new Error(`That is not a valid ${serviceLabel(d.service)} link: check the fields. (${err?.code ?? "error"})`);
+      }
+      const { entries, note } = linkEntries();
+      const prior = kept(entries);
+      if (prior.some((l) => sameAccount(l, link))) throw new Error("That account is already linked.");
+      const links = [...prior, link];
+      if (links.length > rc.MAX_LINKS) throw new Error(`A profile holds at most ${rc.MAX_LINKS} links. Remove one first.`);
+      status(st, "busy", `Checking from this browser (contacts ${contacts(link).join(", ")})…`);
+      const outcome = await check(link, S.state.account);
+      if (!S) return;
+      linkOutcomes.set(linkKey(link), outcome);
+      const s = statusOf({ link, status: "ok" }, outcome);
+      const what = `${serviceLabel(link.service)} · ${link.name}`;
+      const tail = ` Publishing adds “${what}” to your public profile: anyone who looks you up sees it, and copies cannot be taken back.${dropped(entries, note)}`;
+      if (outcome.result === "verified") {
+        status(st, "ok", `${s.text}${tail}`);
+        $("lPublish").textContent = "Publish link";
+      } else {
+        status(st, "warn", `${s.text} ${whereToken(link)} You can publish it anyway; it shows as not verified until the token is in place.${tail}`);
+        $("lPublish").textContent = "Publish anyway";
+      }
+      pending = { link, links };
+      $("lConfirm").hidden = false;
+    } catch (err) {
+      status(st, "error", explain(err));
+    }
+  });
+});
+
+/** Whether two valid links name the same account, as their service compares names ([LNK-2]). */
+function sameAccount(a, b) {
+  if (a.service !== b.service) return false;
+  try {
+    rc.linksValue([a, b], REGISTRY);
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+$("lCancel").addEventListener("click", () => {
+  pending = null;
+  $("lConfirm").hidden = true;
+  status($("linksStatus"), "", "");
+});
+
+$("lPublish").addEventListener("click", () => {
+  const p = pending;
+  if (!p) return;
+  busy($("linksForm"), async () => {
+    const st = $("linksStatus");
+    try {
+      status(st, "busy", "Signing and saving your public profile…");
+      await publishProfile(rc.setData(S.publicData, APP, rc.LINKS_KEY, rc.linksValue(p.links, REGISTRY)));
+      pending = null;
+      $("lConfirm").hidden = true;
+      for (const id of ["lName", "lUid", "lValue"]) $(id).value = "";
+      linkFormChanged();
+      showLinks();
+      status(st, "ok", `Published. Anyone can check “${serviceLabel(p.link.service)} · ${p.link.name}” on your public card.`);
     } catch (err) {
       status(st, "error", explain(err));
     }

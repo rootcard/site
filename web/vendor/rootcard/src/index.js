@@ -11,7 +11,7 @@ export {
   API_VERSION, WELL_KNOWN_PATH, WELL_KNOWN_LIMIT, MAX_WELL_KNOWN_APIS, checkBaseUrl, isOrigin, isVersionSegment, wellKnownBase,
 } from "./binding.js";
 export { ERROR_CODES, RootcardError } from "./errors.js";
-export { canonical, canonicalString, parseJson, parseLimited, validate } from "./json.js";
+export { canonical, canonicalString, parseJson, parseLimited, parseResponseJson, validate } from "./json.js";
 export {
   base64urlEncode, base64urlDecode, base32Encode, base32Decode, base32DecodeLenient, hexEncode, hexDecode,
 } from "./encoding.js";
@@ -32,5 +32,9 @@ export {
   parseChallenge, loginMessage, fetchMessage, changeMessage, signLogin, parseLoginRequest, verifyLogin,
 } from "./messages.js";
 export { statementChallenge, prove, verifyProof } from "./proof.js";
+export {
+  LINKS_KEY, MAX_LINKS, TOKEN_PREFIX, TOKEN_SEARCH_LIMIT, RESPONSE_LIMIT, FETCH_TIMEOUT_SECS, linkToken, findLinkToken,
+  isDomain, parseDescriptor, registry, findDescriptor, parseLink, parseLinks, linksValue, linkRequests, linkDisplay, checkLink,
+} from "./links.js";
 export { exportAccount, importAccount, accountFileName, recoveryCard, readCard, cardText } from "./file.js";
 export { systemRandom } from "./testing.js";

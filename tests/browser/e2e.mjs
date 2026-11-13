@@ -1,5 +1,6 @@
 // End-to-end test of the site in a real browser: register, sign in, profile, private data, export, proofs, password
-// change, public lookup, proof verification on the card page, the host pointer, plus screenshots. Run against a local server started with
+// change, linked accounts (added, checked, removed), public lookup, proof verification on the card page, the host
+// pointer, plus screenshots. Run against a local server started with
 // ROOTCARD_SITE_URLS=http://127.0.0.1:8080 (see README). Needs Playwright; not part of the binary.
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
@@ -60,6 +61,62 @@ await page.waitForFunction(() => document.querySelector("#profileStatus").textCo
   throw e;
 });
 step("profile saved");
+
+// Linked accounts (SPEC §12.3). The services are mocked here, so the test never depends on GitHub or the network: a
+// GitHub account whose bio holds the token, and a website that does not serve it.
+const token = (await page.textContent("#token")).trim();
+const cors = { "access-control-allow-origin": "*", "content-type": "application/json" };
+const githubCalls = [];
+await ctx.route("https://api.github.com/**", (route) => {
+  const u = new URL(route.request().url());
+  githubCalls.push(u.pathname);
+  if (u.pathname === "/users/linktester") return route.fulfill({ status: 200, headers: cors, body: JSON.stringify({ login: "LinkTester", id: 4242 }) });
+  if (u.pathname === "/user/4242") {
+    return route.fulfill({ status: 200, headers: cors, body: JSON.stringify({ login: "LinkTester", id: 4242, bio: `Me elsewhere: ${token}`, blog: null, score: 1.5 }) });
+  }
+  return route.fulfill({ status: 404, headers: cors, body: "{}" });
+});
+await ctx.route("https://example.test/**", (route) =>
+  route.fulfill({ status: 200, headers: { "access-control-allow-origin": "*", "content-type": "text/plain" }, body: "rootcard:SOMEONEELSE\n" }));
+await page.click("[data-tab=links]");
+if (!/^rootcard:[0-9A-Z]{52}$/.test(token)) problems.push(`link token: ${token}`);
+const linkStatus = async (re) => {
+  await page.waitForFunction((r) => new RegExp(r).test(document.querySelector("#linksStatus").textContent), re.source, { timeout: 20000 }).catch(async (e) => {
+    console.log("links:", await page.textContent("#linksStatus"));
+    throw e;
+  });
+};
+await page.selectOption("#lService", "github");
+await page.fill("#lName", "linktester");
+await page.click("#linksForm button[type=submit]");
+await page.waitForSelector("#lConfirm:not([hidden])", { timeout: 20000 });
+await linkStatus(/Verified by this browser/);
+if ((await page.inputValue("#lUid")) !== "4242" || (await page.inputValue("#lName")) !== "LinkTester") problems.push("github uid not filled in");
+await page.click("#lPublish");
+await linkStatus(/Published/);
+step("github link verified and published");
+await page.selectOption("#lService", "web");
+await page.fill("#lName", "example.test");
+await page.click("#linksForm button[type=submit]");
+await page.waitForSelector("#lConfirm:not([hidden])", { timeout: 20000 });
+await linkStatus(/token is not where the link says/);
+await page.click("#lPublish");
+await linkStatus(/Published/);
+if ((await page.$$("#linksList li")).length !== 2) problems.push("account page does not list both links");
+await page.screenshot({ path: `${shots}/account-links.png`, fullPage: true });
+step("web link published unverified");
+// The profile form keeps the links.
+await page.click("[data-tab=profile]");
+await page.fill("#pAbout", "Hello <b>world</b>, linked");
+await page.click("#profileForm button[type=submit]");
+await page.waitForFunction(() => document.querySelector("#profileStatus").textContent.includes("Saved"), null, { timeout: 20000 });
+const kept = await page.evaluate(async (acc) => {
+  const r = await fetch(`/v0/id/${acc}/public`);
+  const p = await r.json();
+  return p.data["user.links"]?.links?.length;
+}, token.slice("rootcard:".length));
+if (kept !== 2) problems.push(`profile save dropped links: ${kept}`);
+
 const [exp] = await Promise.all([page.waitForEvent("download"), (async () => { await page.click("[data-tab=overview]"); await page.click("#export"); })()]);
 step("exported " + exp.suggestedFilename());
 await page.click("[data-tab=prove]");
@@ -103,6 +160,13 @@ await page.fill("#password", "another long passphrase 42");
 await page.click("#signinForm button[type=submit]");
 await page.waitForSelector("#signedIn:not([hidden])", { timeout: 60000 });
 step("signed in with new password; note=" + (await page.inputValue("#pNote")));
+// Take the unverified link off again: the page asks first, then says to take the token down too ([LNK-4]).
+await page.click("[data-tab=links]");
+page.once("dialog", (d) => d.accept());
+await page.click("#linksList li:nth-child(2) .link-actions button:last-child");
+await linkStatus(/Removed\. Remove the token too/);
+if ((await page.$$("#linksList li")).length !== 1) problems.push("link not taken off");
+step("web link taken off");
 
 await page.goto(BASE + "/card?h=" + encodeURIComponent(handle));
 await page.waitForSelector("#result:not([hidden])", { timeout: 20000 }).catch(async (e) => {
@@ -115,6 +179,16 @@ const factLabels = await page.$$eval("#rFacts dt", (ds) => ds.map((d) => d.textC
 if (factLabels.some((l) => /^recovery key$/i.test(l.trim())) || !factLabels.includes("Recovery public key")) {
   problems.push(`public key mislabelled on /card: ${factLabels.join(", ")}`);
 }
+// The card lists the link and fetches nothing until asked; then the viewer's browser checks it ([LNK-11]).
+await page.waitForSelector("#rLinks:not([hidden])");
+const before = githubCalls.length;
+const linkText = await page.textContent("#rLinksList");
+if (!linkText.includes("LinkTester") || !linkText.includes("not checked")) problems.push(`card links: ${linkText}`);
+await page.click("#rLinksCheck");
+await page.waitForSelector("#rLinksList .badge.ok", { timeout: 20000 });
+if (githubCalls.length === before) problems.push("card page did not ask GitHub");
+if ((await page.getAttribute("#rLinksList a", "href")) !== "https://github.com/LinkTester") problems.push("github display URL");
+step("card link verified: " + (await page.textContent("#rLinksList .link-detail")));
 await page.screenshot({ path: `${shots}/card.png` });
 
 // Proofs on the card page ([PRF-4]): the stamp says what was checked.

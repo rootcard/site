@@ -63,6 +63,7 @@
         <div class="tabs" role="tablist">
           <button role="tab" aria-selected="true" data-tab="overview">Overview</button>
           <button role="tab" aria-selected="false" data-tab="profile">Profile &amp; data</button>
+          <button role="tab" aria-selected="false" data-tab="links">Links</button>
           <button role="tab" aria-selected="false" data-tab="password">Password</button>
           <button role="tab" aria-selected="false" data-tab="prove">Prove</button>
           <button role="tab" aria-selected="false" data-tab="recovery">Recovery</button>
@@ -105,6 +106,57 @@
           </div>
           <div class="btn-row"><button class="btn btn-primary" type="submit">Save</button></div>
           <div class="status" id="profileStatus" aria-live="polite"></div>
+        </form>
+
+        <form class="panel" data-panel="links" hidden id="linksForm" novalidate>
+          <h2>Linked accounts</h2>
+          <div class="notice warn"><p>Links are part of your public profile: every host and service that looks you up
+            sees them, and copies cannot be taken back.</p></div>
+          <p class="muted">A link says that an account elsewhere, such as a GitHub account or a domain, is yours. It
+            counts once that account carries your token, in a place only you can write. Anyone can then check it
+            themselves, from their own browser, on your <a id="linksCard" href="/card">public card</a>.</p>
+          <div class="field">
+            <label>Your link token</label>
+            <div class="token"><code id="token"></code><button class="btn btn-sm" type="button" id="copyToken">Copy</button></div>
+            <span class="hint">The same for every account you link. It names only your account id, so it stays valid
+              after password changes, resets, moves and recovery key rotations.</span>
+          </div>
+          <div id="linksNote"></div>
+          <ul class="links" id="linksList"></ul>
+          <p class="muted" id="linksEmpty">No linked accounts yet.</p>
+          <hr>
+          <h3>Add a link</h3>
+          <div class="field">
+            <label for="lService">Service</label>
+            <select id="lService"></select>
+          </div>
+          <div class="field">
+            <label for="lName" id="lNameLabel">Name</label>
+            <input id="lName" type="text" autocapitalize="off" autocomplete="off" spellcheck="false">
+            <span class="hint" id="lNameHint"></span>
+          </div>
+          <div class="field" id="lUidField" hidden>
+            <label for="lUid" id="lUidLabel">Account id</label>
+            <input id="lUid" type="text" autocapitalize="off" autocomplete="off" spellcheck="false">
+            <span class="hint" id="lUidHint"></span>
+          </div>
+          <div class="field" id="lFormField" hidden>
+            <label for="lForm">Where the token is</label>
+            <select id="lForm"></select>
+          </div>
+          <div class="field" id="lValueField" hidden>
+            <label for="lValue" id="lValueLabel">Reference</label>
+            <input id="lValue" type="text" autocapitalize="off" autocomplete="off" spellcheck="false">
+            <span class="hint" id="lValueHint"></span>
+          </div>
+          <div class="notice"><p id="lWhere"></p></div>
+          <p></p>
+          <div class="btn-row"><button class="btn btn-primary" type="submit">Check and add</button></div>
+          <div class="status" id="linksStatus" aria-live="polite"></div>
+          <div class="btn-row" id="lConfirm" hidden>
+            <button class="btn btn-primary" type="button" id="lPublish">Publish link</button>
+            <button class="btn btn-ghost" type="button" id="lCancel">Cancel</button>
+          </div>
         </form>
 
         <form class="panel" data-panel="password" hidden id="passwordForm" novalidate>

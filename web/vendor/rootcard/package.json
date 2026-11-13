@@ -1,6 +1,6 @@
 {
   "name": "rootcard",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "A portable, self-certifying identity for online logins (core library, zero dependencies, WebCrypto)",
   "keywords": [
     "identity",

@@ -13,7 +13,7 @@ One Rust binary serves both:
   `rootcard_host::http::route`, with SQLite storage and the recommended rate limits. Anyone can get an ID card with
   rootcard.org as home from the browser, without running a server or the CLI.
 
-The browser does all the cryptography with the published npm package (`web/vendor/rootcard`, `rootcard@0.3.3`
+The browser does all the cryptography with the published npm package (`web/vendor/rootcard`, `rootcard@0.3.4`
 unchanged, integrity checked against the registry). The server never sees a password or a recovery key.
 
 ## What the pages do
@@ -23,15 +23,18 @@ unchanged, integrity checked against the registry). The server never sees a pass
 | `/` | Home page: what rootcard.org is (one home among many), getting started, questions |
 | `/rootcard` | About the rootcard standard: how it works, power levels, comparison |
 | `/create` | Registration ([CLT-1]): the recovery key is made in a Web Worker, the user must download or print the recovery card before anything is sent, then the registration is built (Argon2id off the main thread) and posted. The log is fetched back and verified |
-| `/account` | Sign-in ([LGN-1]: lookup, log, locks, fetch, local unlock, login), then the low-power functions: public profile, private data in the vault, password change ([CHG-1]), account file export, account proofs ([PRF-1]), including statement proofs ([PRF-5]) shared as a `/card#proof=…` link. The unlocked vault lives only in page memory; leaving the page logs the session out |
-| `/card?h=Name%23TAG` | Public lookup: resolves a handle and verifies log and profile in the browser. Proof verification ([PRF-4]): a pasted proof (bare, or `{ proof, log, statement }`) is checked against the newest of the log sent with it and the log at this home ([VER-4]), and its status is stamped on the ID card: valid for you, a signed public statement, a valid signature with something unchecked, or invalid. `/card#proof=<base64url>` links carry a statement proof in the fragment (never sent to the server) |
+| `/account` | Sign-in ([LGN-1]: lookup, log, locks, fetch, local unlock, login), then the low-power functions: public profile, private data in the vault, password change ([CHG-1]), linked accounts ([LNK-4]: the link token, add with a check from the browser first, remove), account file export, account proofs ([PRF-1]), including statement proofs ([PRF-5]) shared as a `/card#proof=…` link. The unlocked vault lives only in page memory; leaving the page logs the session out |
+| `/card?h=Name%23TAG` | Public lookup: resolves a handle and verifies log and profile in the browser. Proof verification ([PRF-4]): a pasted proof (bare, or `{ proof, log, statement }`) is checked against the newest of the log sent with it and the log at this home ([VER-4]), and its status is stamped on the ID card: valid for you, a signed public statement, a valid signature with something unchecked, or invalid. `/card#proof=<base64url>` links carry a statement proof in the fragment (never sent to the server). Linked accounts of the profile ([LNK-3]) are listed and, when the viewer asks, checked in the viewer's browser ([LNK-9]–[LNK-12]) |
 | `/keytool` | Explains the key tool and offers the npm package's `keytool.html` as a **download only** (never rendered from this origin), with its SHA-256. The site never asks for a recovery key ([PWR-6]) |
 | `/developers` | Integration guide and this home's API |
 | `/.well-known/rootcard` | The host pointer ([HST-23]) naming this origin as the base URL, so clients can be given the bare domain |
+| `/.well-known/rootcard-link` | With `operator_account` in `home.toml`: the operator's link token ([LNK-5]), with open CORS, so the operator's identity can list this home's domain as its website (service `web`) |
 | `/policy` | Operator (`Hexagon#DNTT`), the live host key from `/v0/host`, what is stored and for how long, how to leave |
 
 Every page is served with a strict CSP (`script-src 'self'`, no inline script or style, nothing third-party), `nosniff`,
-`no-referrer`, `frame-ancestors 'none'` and HSTS on https.
+`no-referrer`, `frame-ancestors 'none'` and HSTS on https. `/card` and `/account` may also fetch (`connect-src`) from any
+https origin, which a linked-account check needs (GitHub's API, the linked website, the DNS-over-HTTPS resolver); they do
+so only when the user asks for a check, and read the answers as data only.
 
 ## Run your own home
 
@@ -45,6 +48,8 @@ Everything specific to a home is in `home.toml`, read at build time:
 | `operator` | `Hexagon#DNTT` | The operator's rootcard handle; the policy page links to its verified card |
 | `source` | this repository | The source of the site, linked from the footer and the policy page |
 | `wordmark_html` | `root<b>card</b>.org` | Optional: the wordmark in the header and footer (default: the name) |
+| `dns_resolver` | – | Optional: the DNS-over-HTTPS resolver (JSON API, with CORS) for the TXT records of `dns` links (default: `https://cloudflare-dns.com/dns-query`) |
+| `operator_account` | – | Optional: the operator's account id; `/.well-known/rootcard-link` then serves its link token |
 | `overlay` | – | Optional: a directory (relative to `home.toml`) whose files replace or add to `web/` by path, partials included: your own `policy.html` terms, `img/logo.svg`, `_partials/footer.html` |
 
 Either fork this repository and edit `home.toml`, or keep your home's files elsewhere and build with
@@ -76,8 +81,9 @@ build.rs         embeds web/ into the binary for the home of home.toml (overlay,
                  key tool hash substituted, home-config.js, webmanifest and sitemap generated, ETags)
 home.toml        this build's home: rootcard.org
 homes/example    another home built from the same sources
-web/             pages, CSS, JS, logo; web/_partials are included into every page
-web/vendor/rootcard   the npm package rootcard@0.3.3 (src/, keytool.html, licenses)
+web/             pages, CSS, JS, logo; web/_partials are included into every page; web/js/links.js checks linked
+                 accounts (SPEC §12.3) for the card and account pages
+web/vendor/rootcard   the npm package rootcard@0.3.4 (src/, keytool.html, licenses)
 tests/browser    Playwright end-to-end test of the whole flow
 ```
 
