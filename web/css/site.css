@@ -501,6 +501,19 @@ a.feature { color: inherit; display: block; } a.feature:hover { text-decoration:
 .log-detail { margin: 0.25rem 0 0; font-size: 0.85rem; color: var(--muted); word-break: break-all; }
 .log-detail .mono { font-size: 0.82rem; }
 
+/* Linked accounts (SPEC §12.3): the card page and the account page. */
+.badge.bad { color: #ff7a6b; border-color: rgba(255, 122, 107, 0.4); background: rgba(255, 122, 107, 0.08); }
+.links { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.8rem; }
+.link-item { border-left: 2px solid var(--line-2); padding: 0.1rem 0 0.1rem 0.9rem; }
+.link-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.7rem; font-size: 0.95rem; }
+.link-service { font-weight: 650; }
+.link-name { word-break: break-all; }
+.link-detail { margin: 0.25rem 0 0; font-size: 0.85rem; }
+.link-actions { margin-top: 0.4rem; }
+.links + .btn-row { margin-top: 1rem; }
+.token { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.8rem; }
+.token code { word-break: break-all; }
+
 /* On narrow screens the card comes right after the lookup, so its stamp is seen without scrolling to the bottom. */
 @media (max-width: 920px) {
   .card-page > div { display: contents; }

@@ -20,3 +20,10 @@ wordmark_html = "root<b>card</b><span class=\"tld\">.org</span>"
 # Optional: a directory, relative to this file, whose files replace or add to web/ by path, including web/_partials
 # (for example a policy.html with your own terms, or img/logo.svg).
 # overlay = "web"
+# Optional: the DNS-over-HTTPS resolver (JSON API, answering browsers with CORS) the pages ask for the TXT records of
+# linked domains (`dns` links). Default: https://cloudflare-dns.com/dns-query
+# dns_resolver = "https://cloudflare-dns.com/dns-query"
+# Optional: the operator's account id (52 characters, on the operator's ID card). The server then answers
+# /.well-known/rootcard-link with its link token, so the operator's identity can list this home's domain as a linked
+# website (SPEC §12.3, service "web").
+# operator_account = ""

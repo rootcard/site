@@ -577,9 +577,9 @@ checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
 
 [[package]]
 name = "rootcard"
-version = "0.3.3"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5fd4ec9f3e1dd01fc4930386a4bea4e3e830528cd664e2815a375ea1effb115"
+checksum = "a02a9d42a87722fb5f687ab469594f5186f2adc37257d8723eef1e73c8cf9e75"
 dependencies = [
  "ed25519-dalek",
  "hkdf",
@@ -589,9 +589,9 @@ dependencies = [
 
 [[package]]
 name = "rootcard-host"
-version = "0.3.3"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f7ecf78d25181945ef5ca128afda1d760a6b2c3681996442ad5894461d0b6b5"
+checksum = "9d9dbcbc27c5930097af9751abdda97f5ca68476f917539412d1ce453282b3ea"
 dependencies = [
  "rootcard",
  "zeroize",

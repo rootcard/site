@@ -106,7 +106,7 @@ rootcard = { version = <span class="s">"{{rootcard_version}}"</span>, default-fe
         <p class="muted">The npm package has zero dependencies and no build step. <code>rootcard</code> is the
           verification core; <code>rootcard/vault</code> adds passwords, Argon2id and vault encryption. The flows are in
           the host protocol, §7. This site's pages are a complete client: registration, sign-in, profile and private
-          data, password change and proofs.</p>
+          data, linked accounts, password change and proofs.</p>
         <div class="notice"><p>Generate the recovery key in the client, make the user save the recovery card <em>before</em>
           you send the registration, then erase it. Never ask for the recovery key in an application client.</p></div>
       </div>
@@ -129,7 +129,35 @@ rk.fill(0);
     </div>
   </section>
 
-  <section id="api" class="band">
+  <section id="links" class="band">
+    <div class="wrap grid-2">
+      <div>
+        <span class="eyebrow">Linked accounts</span>
+        <h2>Check a user's GitHub account or domain</h2>
+        <p class="muted">A public profile may list accounts elsewhere in <code>user.links</code> (SPEC §12.3). A link has
+          two sides, and you check both yourself: the signed profile lists the account, and the account carries the
+          identity's token <code>rootcard:&lt;account id&gt;</code> where only its owner can write (a GitHub bio or
+          gist, <code>/.well-known/rootcard-link</code> on a website, a TXT record at <code>_rootcard.&lt;domain&gt;</code>).</p>
+        <p class="muted">The core does no I/O: <code>linkRequests</code> says what to fetch, you fetch it (HTTPS, no
+          redirects, no credentials, at most 64 KiB, 10 s), and <code>checkLink</code> decides. The services are
+          descriptors bundled with the packages, never loaded at run time. Signed-in users of {{home.name}} add links
+          on their account page; the <a href="/card">look-up page</a> checks them in the viewer's browser, on request.</p>
+      </div>
+      <pre><span class="k">const</span> registry = rc.registry();
+<span class="k">const</span> { data } = <span class="k">await</span> rc.verifyPublic(profile, state);
+<span class="k">for</span> (<span class="k">const</span> { link, status } <span class="k">of</span> rc.parseLinks(data, registry)) {
+  <span class="k">if</span> (status !== <span class="s">"ok"</span>) <span class="k">continue</span>;  <span class="c">// unsupported or bad_link</span>
+  <span class="k">const</span> d = rc.findDescriptor(registry, link.service);
+  <span class="k">const</span> answers = <span class="k">await</span> Promise.all(
+    rc.linkRequests(link, d).map(fetchUnderLnk9));
+  rc.checkLink(link, state.account, d, answers);
+  <span class="c">// verified, by you, now; else wrong_owner,</span>
+  <span class="c">// token_missing or fetch_failed</span>
+}</pre>
+    </div>
+  </section>
+
+  <section id="api">
     <div class="wrap">
       <div class="section-head">
         <span class="eyebrow">{{home.name}} as a home</span>
@@ -164,13 +192,15 @@ rk.fill(0);
       <p class="muted">Outside <code>/v0</code>, at the root of the origin, the host pointer
         <code>GET {{home.url}}/.well-known/rootcard</code> ([HST-23]) answers
         <code>{ "v": 1, "base": "{{home.url}}", "api": ["v0"] }</code>, so clients given the bare domain
-        resolve it with <code>wellKnownBase</code>.</p>
+        resolve it with <code>wellKnownBase</code>. When the operator has named their account id, the origin also
+        serves <code>GET {{home.url}}/.well-known/rootcard-link</code>: the operator's link token, so the operator's
+        identity can list {{home.host}} as its website.</p>
       <p class="muted">Errors are JSON objects with the specification's codes (<code>{ "error": "not_home", … }</code>).
         CORS is open and no endpoint uses cookies. Full details: <a href="https://github.com/rootcard/rootcard/blob/main/docs/HOST_PROTOCOL.md">HOST_PROTOCOL.md</a>.</p>
     </div>
   </section>
 
-  <section>
+  <section class="band">
     <div class="wrap">
       <div class="section-head">
         <span class="eyebrow">Packages</span>

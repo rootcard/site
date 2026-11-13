@@ -7,7 +7,8 @@ export const ERROR_CODES = Object.freeze([
   "ambiguous_handle", "account_mismatch", "wrong_recovery_key", "too_many_events", "bad_kind", "bad_seq", "bad_prev",
   "time_backwards", "future_time", "bad_time", "wrong_signer", "key_reuse", "bad_receipt", "bad_reason",
   "account_retired", "no_instance", "stale_version", "fork", "wrong_instance", "stale_rev", "stale_locks", "bad_locks",
-  "kdf_params", "weak_password", "unlock_failed", "wrong_account_key", "bad_data_key", "wrong_challenge",
+  "kdf_params", "weak_password", "unlock_failed", "wrong_account_key", "bad_data_key", "bad_link", "unsupported",
+  "wrong_owner", "token_missing", "fetch_failed", "wrong_challenge",
   "wrong_recipient", "challenge_unknown", "challenge_expired", "not_home", "wrong_host", "unknown_account",
   "unauthorized", "rate_limited", "unsupported_browser",
 ]);

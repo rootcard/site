@@ -96,6 +96,11 @@ const WHY = {
   bad_signature: "A signature does not verify.",
   too_large: "That is too large.",
   bad_data_key: "That profile field is not allowed.",
+  bad_link: "That linked account breaks the rules of its service.",
+  unsupported: "This site does not know that kind of linked account.",
+  wrong_owner: "The linked account belongs to someone else now.",
+  token_missing: "The link token is not where the link says.",
+  fetch_failed: "The linked service did not answer.",
 };
 
 /** A sentence for an error. */

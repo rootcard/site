@@ -119,12 +119,38 @@ export function parseJson(bytes) {
   } catch {
     fail("bad_json");
   }
-  const p = { s: text, i: 0 };
+  const p = { s: text, i: 0, lenient: false };
   ws(p);
   const v = value(p, 1);
   ws(p);
   if (p.i !== p.s.length) fail("bad_json");
   return v;
+}
+
+const SKIP = Symbol("dropped");
+
+/**
+ * Parse a JSON text from outside rootcard, such as a linked service's answer ([LNK-9]): any RFC 8259 text that is
+ * well-formed UTF-8 without a byte order mark, with unique member names, no lone surrogate escapes and at most 32
+ * levels of nesting. `null` and numbers that are not safe integers in the form `0|-?[1-9][0-9]*` are dropped (an
+ * object member or array element with such a value is left out). Returns `undefined` if the whole text is such a value.
+ * → bad_json
+ */
+export function parseResponseJson(bytes) {
+  if (typeof bytes === "string") bytes = enc.encode(bytes);
+  if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) fail("bad_json");
+  let text;
+  try {
+    text = dec.decode(bytes);
+  } catch {
+    fail("bad_json");
+  }
+  const p = { s: text, i: 0, lenient: true };
+  ws(p);
+  const v = value(p, 1);
+  ws(p);
+  if (p.i !== p.s.length) fail("bad_json");
+  return v === SKIP ? undefined : v;
 }
 
 /** Parse with a size limit ([CJ-8]). → too_large, bad_json */
@@ -155,6 +181,7 @@ function value(p, depth) {
     if (depth > MAX_DEPTH) fail("bad_json");
     p.i++;
     const o = obj();
+    const dropped = new Set();
     ws(p);
     if (p.s[p.i] === "}") {
       p.i++;
@@ -168,8 +195,9 @@ function value(p, depth) {
       eat(p, ":");
       ws(p);
       const v = value(p, depth + 1);
-      if (Object.prototype.hasOwnProperty.call(o, k)) fail("bad_json");
-      o[k] = v;
+      if (Object.prototype.hasOwnProperty.call(o, k) || dropped.has(k)) fail("bad_json");
+      if (v === SKIP) dropped.add(k);
+      else o[k] = v;
       ws(p);
       if (p.s[p.i] === ",") p.i++;
       else if (p.s[p.i] === "}") {
@@ -189,7 +217,8 @@ function value(p, depth) {
     }
     for (;;) {
       ws(p);
-      a.push(value(p, depth + 1));
+      const v = value(p, depth + 1);
+      if (v !== SKIP) a.push(v);
       ws(p);
       if (p.s[p.i] === ",") p.i++;
       else if (p.s[p.i] === "]") {
@@ -207,21 +236,49 @@ function value(p, depth) {
     eat(p, "false");
     return false;
   }
+  if (c === "n" && p.lenient) {
+    eat(p, "null");
+    return SKIP;
+  }
   if (c === "-" || (c >= "0" && c <= "9")) return number(p);
   fail("bad_json");
 }
 
+function isDigit(c) {
+  return c !== undefined && c >= "0" && c <= "9";
+}
+
+function digits(p) {
+  if (!isDigit(p.s[p.i])) fail("bad_json");
+  while (isDigit(p.s[p.i])) p.i++;
+}
+
 function number(p) {
-  const m = /^-?(0|[1-9][0-9]*)/.exec(p.s.slice(p.i, p.i + 20));
-  if (!m) fail("bad_json");
-  const text = m[0];
-  p.i += text.length;
+  const start = p.i;
+  if (p.s[p.i] === "-") p.i++;
+  if (p.s[p.i] === "0") p.i++;
+  else if (isDigit(p.s[p.i])) while (isDigit(p.s[p.i])) p.i++;
+  else fail("bad_json");
+  const text = p.s.slice(start, p.i);
   const next = p.s[p.i];
-  if (next === "." || next === "e" || next === "E" || (next >= "0" && next <= "9")) fail("bad_json");
-  if (text === "-0" || text.length > 17) fail("bad_json");
-  const n = Number(text);
-  if (!Number.isSafeInteger(n)) fail("bad_json");
-  return n;
+  if (next === "." || next === "e" || next === "E") {
+    if (!p.lenient) fail("bad_json");
+    // RFC 8259 fraction and exponent; the number is dropped.
+    if (p.s[p.i] === ".") {
+      p.i++;
+      digits(p);
+    }
+    if (p.s[p.i] === "e" || p.s[p.i] === "E") {
+      p.i++;
+      if (p.s[p.i] === "+" || p.s[p.i] === "-") p.i++;
+      digits(p);
+    }
+    return SKIP;
+  }
+  const n = text === "-0" || text.length > 17 ? NaN : Number(text);
+  if (Number.isSafeInteger(n)) return n;
+  if (p.lenient) return SKIP;
+  fail("bad_json");
 }
 
 function hex4(p) {

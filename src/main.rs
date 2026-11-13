@@ -59,12 +59,41 @@ struct App {
     /// The number of identities homed here, for `/stats.json`: counted by the sweeper once a minute, so that the page
     /// cannot make anyone hold the database lock for a table scan.
     cards: AtomicI64,
+    /// The body of `/.well-known/rootcard-link`, if this home has one.
+    link_tokens: Option<String>,
 }
 
 /// The strict policy for every page the site serves: they handle passwords (rootcard THREAT_MODEL.md T19), so no inline
 /// script and nothing from a third party.
 const CSP: &str = "default-src 'none'; script-src 'self'; worker-src 'self'; style-src 'self'; img-src 'self' data: blob:; \
     connect-src 'self'; font-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+
+/// The policy of the pages that check linked accounts (SPEC §12.3), `/card` and `/account`: the same, except that the
+/// browser may fetch from any https origin. A check reads a service's answer (GitHub's API, a website's
+/// `/.well-known/rootcard-link`, DNS over HTTPS) only as data ([LNK-9]); scripts and styles stay this origin's own. The
+/// pages fetch only when the user asks for a check.
+const CSP_LINKS: &str = "default-src 'none'; script-src 'self'; worker-src 'self'; style-src 'self'; img-src 'self' data: blob:; \
+    connect-src 'self' https:; font-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+
+/// The pages served with [`CSP_LINKS`].
+const LINK_PAGES: [&str; 2] = ["/card.html", "/account.html"];
+
+/// Where a website holds the link tokens of its owner's identities (the registry's `web` service).
+const LINK_TOKEN_PATH: &str = "/.well-known/rootcard-link";
+
+/// The operator's account id from `home.toml`, or empty.
+const OPERATOR_ACCOUNT: &str = env!("ROOTCARD_HOME_OPERATOR_ACCOUNT");
+
+/// The body of `/.well-known/rootcard-link`: the operator's link token ([LNK-5]), or `None` when `home.toml` names no
+/// operator account. A malformed id is an error, reported at start.
+fn link_token_file() -> Result<Option<String>, String> {
+    if OPERATOR_ACCOUNT.is_empty() {
+        return Ok(None);
+    }
+    rootcard::links::link_token(OPERATOR_ACCOUNT)
+        .map(|t| Some(format!("{t}\n")))
+        .map_err(|e| format!("home.toml: operator_account is not an account id ({e})"))
+}
 
 fn now() -> i64 {
     SystemTime::now()
@@ -189,6 +218,7 @@ fn config() -> HostConfig {
 #[tokio::main]
 async fn main() {
     let config = config();
+    let link_tokens = link_token_file().unwrap_or_else(|e| fail(e));
     let https = config.urls.iter().all(|u| u.starts_with("https://"));
     let urls = config.urls.join(", ");
     let db_path = PathBuf::from(env("ROOTCARD_SITE_DB").unwrap_or_else(|| "rootcard-site.db".into()));
@@ -202,6 +232,7 @@ async fn main() {
         trust_proxy: env("ROOTCARD_SITE_TRUST_PROXY").is_some_and(|v| v == "1" || v == "true"),
         https,
         cards: AtomicI64::new(-1),
+        link_tokens,
     });
 
     let sweeper = app.clone();
@@ -321,6 +352,8 @@ async fn handle(
         api(&app, peer, req).await
     } else if path == WELL_KNOWN_PATH {
         host_pointer(&app, req.method(), req.headers())
+    } else if path == LINK_TOKEN_PATH && app.link_tokens.is_some() {
+        link_tokens(&app, req.method())
     } else {
         site(&app, req.method(), &path, req.uri().query(), req.headers()).await
     };
@@ -440,6 +473,35 @@ fn host_pointer(app: &App, method: &Method, headers: &HeaderMap) -> Response {
     r
 }
 
+/// `GET /.well-known/rootcard-link`: the operator's link token as text, readable by a check in any browser (CORS).
+fn link_tokens(app: &App, method: &Method) -> Response {
+    if method != Method::GET && method != Method::HEAD {
+        let mut r = Response::new(Body::empty());
+        *r.status_mut() = StatusCode::METHOD_NOT_ALLOWED;
+        r.headers_mut()
+            .insert(header::ALLOW, HeaderValue::from_static("GET, HEAD"));
+        return r;
+    }
+    let body = if method == Method::HEAD {
+        String::new()
+    } else {
+        app.link_tokens.clone().unwrap_or_default()
+    };
+    let mut r = Response::new(Body::from(body));
+    let h = r.headers_mut();
+    h.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("text/plain; charset=utf-8"),
+    );
+    h.insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, HeaderValue::from_static("*"));
+    h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
+    h.insert(
+        header::CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static("default-src 'none'"),
+    );
+    r
+}
+
 /// The file behind a site path: `/` is `index.html`, `/create` is `create.html`.
 fn asset_for(path: &str) -> Option<&'static assets::Asset> {
     if path.contains("/_") || path.contains("..") {
@@ -536,7 +598,12 @@ async fn site(app: &Arc<App>, method: &Method, path: &str, query: Option<&str>, 
     h.insert(header::CONTENT_TYPE, HeaderValue::from_static(asset.mime));
     h.insert(header::ETAG, HeaderValue::from_static(asset.etag));
     h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
-    h.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static(CSP));
+    let csp = if LINK_PAGES.contains(&asset.path) {
+        CSP_LINKS
+    } else {
+        CSP
+    };
+    h.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static(csp));
     h.insert(
         "permissions-policy",
         HeaderValue::from_static("camera=(), microphone=(), geolocation=(), interest-cohort=()"),
@@ -634,6 +701,16 @@ mod tests {
         }
         for ip in ["203.0.113.7", "2001:db8::1", "::ffff:203.0.113.7"] {
             assert!(!is_proxy_address(ip.parse().expect("ip")), "{ip}");
+        }
+    }
+
+    #[test]
+    fn link_token_configured() {
+        // A home.toml with a malformed operator_account must fail here, not only at start.
+        let file = link_token_file().expect("operator_account");
+        assert_eq!(file.is_some(), !OPERATOR_ACCOUNT.is_empty());
+        for page in LINK_PAGES {
+            assert!(assets::find(page).is_some(), "{page}");
         }
     }
 

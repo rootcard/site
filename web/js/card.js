@@ -6,6 +6,7 @@
 // A pasted proof is checked as it changes: there is no button to press.
 
 import { HOME, REALM, busy, explain, groups, http, instanceTime, now, rc, renderCard, status, tilt } from "/js/common.js";
+import { REGISTRY, check, contacts, renderLinks } from "/js/links.js";
 
 const $ = (id) => document.getElementById(id);
 const card = $("card");
@@ -15,6 +16,7 @@ tilt(card);
 
 const ACCOUNT = /^[0-9A-Z]{52}$/;
 let proofRun = 0; // the newest proof check; older ones leave the page alone
+let shown = null; // the links of the identity on screen: { account, entries, outcomes }
 let proofTimer;
 
 function fact(dl, k, v, mono, note) {
@@ -243,10 +245,67 @@ async function show(log, state, proof) {
   for (const c of proof?.checks ?? []) checks.append(li(c));
   checks.append(li("Anything the profile or a statement says was written by the identity's owner, not checked by anyone."));
   renderLog(log, state);
+  showLinks(state, profileOk ? data : null);
   showProof(proof);
   $("result").hidden = false;
   $("grid").classList.add("has-result");
 }
+
+// ---- linked accounts (SPEC §12.3) ----
+
+/**
+ * The links of the verified profile of the current instance ([LNK-3]): only that profile's, and only when this home is
+ * the identity's home, so the profile is the newest. Nothing is fetched until the viewer asks.
+ */
+function showLinks(state, data) {
+  const box = $("rLinks");
+  let entries = [];
+  let note = "";
+  if (data && !state.retired) {
+    try {
+      entries = rc.parseLinks(data, REGISTRY);
+    } catch (e) {
+      note = e?.code === "unsupported"
+        ? "The profile lists linked accounts in a newer format than this page reads."
+        : "The profile's list of linked accounts is malformed, so none is shown.";
+    }
+  }
+  shown = { account: state.account, entries, outcomes: new Map() };
+  const visible = entries.filter((e) => e.status !== "bad_link");
+  box.hidden = !visible.length && !note;
+  $("rLinksNote").replaceChildren(...(note ? [notice("warn", note)] : []));
+  const hosts = new Set(visible.filter((e) => e.status === "ok").flatMap((e) => contacts(e.link)));
+  $("rLinksHosts").textContent = hosts.size ? [...hosts].join(", ") : "nothing to check";
+  $("rLinksRow").hidden = hosts.size === 0;
+  drawLinks();
+}
+
+function drawLinks() {
+  if (!shown) return;
+  renderLinks($("rLinksList"), shown.entries, shown.outcomes, { onCheck: (i) => checkLinks([i]) });
+}
+
+/** Check the links at `indexes` in this browser; a result for an identity no longer on screen is dropped. */
+async function checkLinks(indexes) {
+  const s = shown;
+  for (const b of document.querySelectorAll("#rLinks button")) b.disabled = true;
+  try {
+    await Promise.all(
+      indexes.map(async (i) => {
+        const entry = s.entries[i];
+        if (entry?.status !== "ok") return;
+        const outcome = await check(entry.link, s.account);
+        if (shown !== s) return;
+        s.outcomes.set(entry, outcome);
+      }),
+    );
+  } finally {
+    if (shown === s) drawLinks();
+    for (const b of document.querySelectorAll("#rLinks button")) b.disabled = false;
+  }
+}
+
+$("rLinksCheck").addEventListener("click", () => checkLinks(shown ? shown.entries.map((_, i) => i) : []));
 
 function showProof(proof) {
   $("rProof").hidden = !proof;
