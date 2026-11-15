@@ -71,8 +71,8 @@ export async function http(method, path, body, token) {
 
 const WHY = {
   weak_password: "The password is too weak: use at least 12 characters, and not your username.",
-  bad_username: "Usernames are 3–20 letters, digits, - or _, starting with a letter.",
-  username_policy: "Usernames are 3–20 letters, digits, - or _, starting with a letter.",
+  bad_username: "Usernames are 2–20 letters, digits, - or _, starting with a letter.",
+  username_policy: "Usernames are 2–20 letters, digits, - or _, starting with a letter.",
   handle_taken: "That exact handle is taken. Start over: a new recovery card gets a new tag.",
   bad_handle: "That does not look like a handle. It is the name, a # and the 4-character tag, like Astra#3F9C.",
   unknown_account: "No identity with that handle is known here.",
