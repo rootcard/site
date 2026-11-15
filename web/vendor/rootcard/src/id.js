@@ -17,9 +17,9 @@ export function checkUsername(username) {
   if (typeof username !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/.test(username)) fail("bad_username");
 }
 
-/** The default username policy ([USR-3]): [USR-1], 3 to 20 characters, beginning with A–Z a–z. */
+/** The default username policy ([USR-3]): [USR-1], 2 to 20 characters, beginning with A–Z a–z. */
 export function defaultUsernamePolicy(username) {
-  return /^[A-Za-z][A-Za-z0-9_-]{2,19}$/.test(username);
+  return /^[A-Za-z][A-Za-z0-9_-]{1,19}$/.test(username);
 }
 
 /** [USR-2] */
