@@ -31,9 +31,12 @@ export class HttpError extends Error {
   }
 }
 
-/** A request to this home. Errors with a code of SPEC §20 become RootcardError, carrying the answer as `body`. */
-export async function http(method, path, body, token) {
-  const headers = {};
+/**
+ * A request to this home. Errors with a code of SPEC §20 become RootcardError, carrying the answer as `body`.
+ * `extra` are more request headers (the invite of a registration).
+ */
+export async function http(method, path, body, token, extra = {}) {
+  const headers = { ...extra };
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (token) headers.Authorization = `Bearer ${token}`;
   let res;
@@ -104,10 +107,18 @@ const WHY = {
 };
 
 /** A sentence for an error. */
+/** The site's own error codes: who may register with this home (not in the host protocol). */
+const SITE_WHY = {
+  invite_required: `${HOME.name} takes new identities by invitation only. Enter the invite you were given.`,
+  invite_invalid: `${HOME.name} does not accept this invite. Check it, or ask whoever invited you for a new one.`,
+  registration_closed: `${HOME.name} takes no new identities.`,
+};
+
 export function explain(e) {
   if (e instanceof rc.RootcardError || (e && typeof e.code === "string" && rc.ERROR_CODES.includes(e.code))) {
     return `${WHY[e.code] ?? "Something went wrong."} (${e.code})`;
   }
+  if (e instanceof HttpError && SITE_WHY[e.body?.error]) return SITE_WHY[e.body.error];
   if (e instanceof HttpError) return e.status >= 500 ? "The server had a problem. Try again in a moment." : e.message;
   return String(e?.message ?? e);
 }

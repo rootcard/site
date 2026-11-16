@@ -12,7 +12,14 @@
 //! - `ROOTCARD_HOME_URL` and `ROOTCARD_HOME_REALM` are set for the server's defaults, `ROOTCARD_HOME_OPERATOR_ACCOUNT`
 //!   for `/.well-known/rootcard-link`.
 //!
+//! - The conditional parts of the pages (`<!--#if FLAG-->`, `src/cond.rs`) are checked here and applied by the server
+//!   when it starts: a flag is a page of this build or a registration mode.
+//!
 //! Every asset gets a strong ETag (its SHA-256).
+
+#[path = "src/cond.rs"]
+#[allow(dead_code)] // build.rs only checks the markers; the server applies them
+mod cond;
 
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -276,6 +283,7 @@ fn mime(path: &str) -> &'static str {
 
 fn main() {
     println!("cargo:rerun-if-changed=web");
+    println!("cargo:rerun-if-changed=src/cond.rs");
     println!("cargo:rerun-if-env-changed=ROOTCARD_HOME");
     let home_path = PathBuf::from(std::env::var("ROOTCARD_HOME").unwrap_or_else(|_| "home.toml".into()));
     println!("cargo:rerun-if-changed={}", home_path.display());
@@ -312,6 +320,13 @@ fn main() {
         fs::read_to_string(p).unwrap_or_else(|e| panic!("{}: {e}", p.display()))
     };
 
+    // The pages a home can choose to serve or not, by name (`create.html` is `create`): the flags of `<!--#if-->`.
+    let page_names: Vec<String> = files
+        .keys()
+        .filter_map(|rel| rel.strip_suffix(".html"))
+        .filter(|n| !n.contains('/'))
+        .map(str::to_string)
+        .collect();
     let mut assets: Vec<(String, Vec<u8>)> = Vec::new();
     let mut sitemap = Vec::new();
     for (rel, f) in &files {
@@ -350,6 +365,11 @@ fn main() {
                     .replace("{{page.url}}", &url)
                     .replace("{{page.title}}", &title)
                     .replace("{{page.description}}", &description);
+            }
+            for flag in cond::flags(&text).unwrap_or_else(|e| panic!("web/{rel}: {e}")) {
+                if !page_names.contains(&flag) && !cond::MODES.contains(&flag.as_str()) {
+                    panic!("web/{rel}: <!--#if {flag}-->: not a page of this build or a registration mode");
+                }
             }
             if !text.contains("<meta name=\"robots\" content=\"noindex") {
                 sitemap.push(url);

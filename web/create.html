@@ -27,6 +27,12 @@
 
       <form class="panel" id="step1" novalidate>
         <h2>Choose a username and a password</h2>
+        <!--#if invite--><div class="field">
+          <label for="invite">Invite</label>
+          <input id="invite" name="invite" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="128" required>
+          <span class="hint">{{home.name}} takes new identities by invitation. An invitation link fills this in; or paste
+            the invite you were given. It is checked before your recovery card is made.</span>
+        </div><!--#endif-->
         <div class="field">
           <label for="username">Username</label>
           <input id="username" name="username" type="text" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="20" required>

@@ -2,23 +2,24 @@
   <div class="wrap footer-inner">
     <div class="footer-brand">
       <a class="brand" href="/"><img src="/img/logo.svg" alt="" width="28" height="28"><span class="wordmark">{{home.wordmark}}</span></a>
-      <p>A public home for rootcard identities. rootcard is an open standard: anyone can run a home, and every identity
-        can move between them.</p>
+      <p><!--#if open-->A public home<!--#else-->A home<!--#endif--> for rootcard identities<!--#if invite-->, by
+        invitation<!--#endif--><!--#if closed-->, not taking new ones<!--#endif-->. rootcard is an open standard: anyone
+        can run a home, open to all or not, and every identity can move between them.</p>
     </div>
     <div class="footer-cols">
       <div>
         <h4>{{home.name}}</h4>
-        <a href="/create">Create a card</a>
-        <a href="/account">Sign in</a>
-        <a href="/card">Look up an ID card</a>
-        <a href="/keytool">Key tool</a>
-        <a href="/developers#api">This home's API</a>
-        <a href="/policy">Operator and policy</a>
+        <!--#if create--><a href="/create">Create a card</a><!--#endif-->
+        <!--#if account--><a href="/account">Sign in</a><!--#endif-->
+        <!--#if card--><a href="/card">Look up an ID card</a><!--#endif-->
+        <!--#if keytool--><a href="/keytool">Key tool</a><!--#endif-->
+        <!--#if developers--><a href="/developers#api">This home's API</a><!--#endif-->
+        <!--#if policy--><a href="/policy">Operator and policy</a><!--#endif-->
         <a href="{{home.source}}">Source of this site</a>
       </div>
       <div>
         <h4>The rootcard standard</h4>
-        <a href="/rootcard">About rootcard</a>
+        <!--#if rootcard--><a href="/rootcard">About rootcard</a><!--#endif-->
         <a href="https://github.com/rootcard/rootcard/blob/main/spec/SPEC.md">Specification</a>
         <a href="https://github.com/rootcard/rootcard/blob/main/docs/HOST_PROTOCOL.md">Host protocol</a>
         <a href="https://github.com/rootcard/rootcard/blob/main/docs/THREAT_MODEL.md">Threat model</a>
@@ -26,7 +27,7 @@
       </div>
       <div>
         <h4>Developers</h4>
-        <a href="/developers">Integrate</a>
+        <!--#if developers--><a href="/developers">Integrate</a><!--#endif-->
         <a href="https://crates.io/crates/rootcard">crates.io/rootcard</a>
         <a href="https://crates.io/crates/rootcard-host">crates.io/rootcard-host</a>
         <a href="https://www.npmjs.com/package/rootcard">npm/rootcard</a>

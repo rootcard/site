@@ -9,12 +9,12 @@
       <span></span><span></span><span></span>
     </button>
     <nav id="nav" class="nav" aria-label="Main">
-      <a href="/rootcard" data-nav="rootcard">About rootcard</a>
-      <a href="/developers" data-nav="developers">Developers</a>
-      <a href="/keytool" data-nav="keytool">Key tool</a>
-      <a href="/card" data-nav="card">Look up</a>
-      <a href="/account" data-nav="account">Sign in</a>
-      <a class="btn btn-primary btn-sm" href="/create" data-nav="create">Create a card</a>
+      <!--#if rootcard--><a href="/rootcard" data-nav="rootcard">About rootcard</a><!--#endif-->
+      <!--#if developers--><a href="/developers" data-nav="developers">Developers</a><!--#endif-->
+      <!--#if keytool--><a href="/keytool" data-nav="keytool">Key tool</a><!--#endif-->
+      <!--#if card--><a href="/card" data-nav="card">Look up</a><!--#endif-->
+      <!--#if account--><a href="/account" data-nav="account">Sign in</a><!--#endif-->
+      <!--#if create--><a class="btn btn-primary btn-sm" href="/create" data-nav="create">Create a card</a><!--#endif-->
     </nav>
   </div>
 </header>

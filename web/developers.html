@@ -68,7 +68,14 @@ state.handle    <span class="c">// "Astra#3F9C", for display</span></pre>
           challenges, sessions), pass your clock and random bytes, and wire <code>http::route</code> into any HTTP
           server.</p>
         <p class="muted">This site is exactly that: an axum server with SQLite storage. <a href="{{home.source}}">Its
-          source</a> is a good starting point.</p>
+          source</a> is a good starting point, and runs as a home of its own unchanged.</p>
+        <p class="muted">A home decides who may get an identity there. The site runs as an <b>open</b> home (anyone may
+          register<!--#if open-->, as with {{home.name}}<!--#endif-->), a home <b>by invitation</b>
+          (<code>ROOTCARD_SITE_REGISTRATION=invite</code>: a registration needs an invite, sent as a link such as
+          <code>https://id.example.com/create#invite=…</code>) or a <b>closed</b> home
+          (<code>ROOTCARD_SITE_REGISTRATION=closed</code>: no new identities). <code>ROOTCARD_SITE_PAGES=minimal</code>
+          leaves only the pages its users need: sign-in, look-up, the key tool, the policy and, unless closed,
+          registration. In every mode the identities it holds sign in, prove and move like on any home.</p>
         <ul class="muted">
           <li>Hosts never see a password and never run Argon2id.</li>
           <li>Build the core without its <code>vault</code> feature.</li>
@@ -123,7 +130,8 @@ rk.fill(0);
 
 <span class="c">// show and save reg.card first, then:</span>
 <span class="k">await</span> fetch(`${base}/v0/id/register`, { method: <span class="s">"POST"</span>,
-  headers: { <span class="s">"Content-Type"</span>: <span class="s">"application/json"</span> },
+  headers: { <span class="s">"Content-Type"</span>: <span class="s">"application/json"</span><!--#if invite-->,
+             <span class="s">"Rootcard-Invite"</span>: invite<!--#endif--> },
   body: JSON.stringify({ log: reg.log, vault: reg.vault,
                          public: reg.public }) });</pre>
     </div>
@@ -175,9 +183,13 @@ rk.fill(0);
             <tr><td><code>GET /id/lookup?realm={{home.realm}}&amp;handle=…</code></td><td>Resolve a handle to an account id and its home</td><td>120 / min</td><td>–</td></tr>
             <tr><td><code>GET /id/{account}/log</code></td><td>The newest log</td><td>120 / min</td><td>–</td></tr>
             <tr><td><code>GET /id/{account}/public</code></td><td>The signed public profile</td><td>120 / min</td><td>–</td></tr>
-            <tr><td><code>POST /id/register</code></td><td>Register an identity with this home</td><td>3 / hour</td><td>–</td></tr>
+            <tr><td><code>POST /id/register</code></td><td>Register an identity with this home<!--#if invite-->, with an
+              invite in the <code>Rootcard-Invite</code> header<!--#endif--><!--#if closed-->: closed, answers
+              <code>registration_closed</code><!--#endif--></td><td>3 / hour</td><td>–</td></tr>
             <tr><td><code>POST /id/{account}/events</code></td><td>Newer events (rotation, retirement)</td><td>30 / hour</td><td>–</td></tr>
-            <tr><td><code>POST /id/{account}/instance</code></td><td>Move here or reset (key tool)</td><td>30 / hour</td><td>–</td></tr>
+            <tr><td><code>POST /id/{account}/instance</code></td><td>Move here or reset (key tool)<!--#if invite-->; a move
+              here needs an invite, like a registration<!--#endif--><!--#if closed-->; closed to identities moving
+              here<!--#endif--></td><td>30 / hour</td><td>–</td></tr>
             <tr><td><code>GET /id/{account}/locks</code></td><td>Lock hints for sign-in</td><td>30 / hour</td><td>30 / hour</td></tr>
             <tr><td><code>POST /id/{account}/challenge</code></td><td>A single-use challenge (60 s)</td><td>10 / min</td><td>30 / hour</td></tr>
             <tr><td><code>POST /id/{account}/fetch</code></td><td>The vault, after a lock proof</td><td>30 / hour</td><td>10 / hour</td></tr>
@@ -195,6 +207,16 @@ rk.fill(0);
         resolve it with <code>wellKnownBase</code>. When the operator has named their account id, the origin also
         serves <code>GET {{home.url}}/.well-known/rootcard-link</code>: the operator's link token, so the operator's
         identity can list {{home.host}} as its website.</p>
+      <!--#if open--><p class="muted">{{home.name}} is an open home: anyone may register. Other homes running this
+        software may take registrations only with an invite (<code>Rootcard-Invite</code> header) or none, and then
+        answer 403 with <code>invite_required</code>, <code>invite_invalid</code> or
+        <code>registration_closed</code>.</p><!--#endif--><!--#if invite--><p class="muted">{{home.name}} takes new
+        identities by invitation: <code>POST /id/register</code>, and <code>POST /id/{account}/instance</code> for an
+        identity not homed here yet, need an invite in the <code>Rootcard-Invite</code> header, or answer 403 with
+        <code>invite_required</code> or <code>invite_invalid</code>. <code>POST {{home.url}}/invite</code> with the
+        header checks an invite without using it (204, or 403 with the same codes).</p><!--#endif--><!--#if closed--><p class="muted">{{home.name}}
+        is closed to new identities: <code>POST /id/register</code>, and <code>POST /id/{account}/instance</code> for an
+        identity not homed here, answer 403 with <code>registration_closed</code>.</p><!--#endif-->
       <p class="muted">Errors are JSON objects with the specification's codes (<code>{ "error": "not_home", … }</code>).
         CORS is open and no endpoint uses cookies. Full details: <a href="https://github.com/rootcard/rootcard/blob/main/docs/HOST_PROTOCOL.md">HOST_PROTOCOL.md</a>.</p>
     </div>
