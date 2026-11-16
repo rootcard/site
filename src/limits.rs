@@ -34,6 +34,13 @@ pub struct Class {
     pub identity: Option<Limit>,
 }
 
+/// The site's own invite check (`POST /invite`), per address: a guess there costs as much as one here.
+pub const INVITE: Class = Class {
+    name: "invite",
+    address: per(10, HOUR),
+    identity: None,
+};
+
 /// Whether `a` has the form of an account id (52 digits and upper-case letters). Only those are counted per
 /// identity, so arbitrary path segments cannot fill the limiter's memory.
 fn is_account(a: &str) -> bool {

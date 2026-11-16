@@ -17,6 +17,8 @@ ENV ROOTCARD_SITE_BIND=0.0.0.0:8080 \
     ROOTCARD_SITE_TRUST_PROXY=1
 # ROOTCARD_SITE_TRUST_PROXY=1: run behind a reverse proxy that appends the client address to X-Forwarded-For. The header
 # is only taken from loopback and private addresses, but publish the port to the proxy alone, not to the internet.
+# A home by invitation: -e ROOTCARD_SITE_INVITES_FILE=/data/invites.txt, then `docker exec <c> rootcard-site invite`.
+# Closed: -e ROOTCARD_SITE_REGISTRATION=closed. Fewer pages: -e ROOTCARD_SITE_PAGES=minimal. See README.md.
 VOLUME /data
 EXPOSE 8080
 CMD ["rootcard-site"]

@@ -28,5 +28,9 @@ jobs:
           npx playwright install --with-deps chromium
           ROOTCARD_SITE_URLS=http://127.0.0.1:8080 ROOTCARD_SITE_DB=/tmp/site.db ROOTCARD_SITE_KEY_FILE=/tmp/host.key \
             ./target/debug/rootcard-site &
+          ROOTCARD_SITE_URLS=http://127.0.0.1:8081 ROOTCARD_SITE_BIND=127.0.0.1:8081 ROOTCARD_SITE_DB=/tmp/invite.db \
+            ROOTCARD_SITE_KEY_FILE=/tmp/invite.key ROOTCARD_SITE_INVITES=e2e-invite-token ROOTCARD_SITE_PAGES=minimal \
+            ./target/debug/rootcard-site &
           sleep 2
           node tests/browser/e2e.mjs
+          node tests/browser/invite.mjs

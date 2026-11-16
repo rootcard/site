@@ -52,8 +52,12 @@
       <section class="panel" id="terms">
         <h2>Service</h2>
         <ul class="muted">
-          <li>Free to use for the <code>{{home.realm}}</code> realm. Usage is limited per network address and per identity; the
-            limits are listed in <a href="/developers#api">this home's API</a>.</li>
+          <li><!--#if open-->Free to use for the <code>{{home.realm}}</code> realm, open to anyone.<!--#endif--><!--#if invite-->For
+            the <code>{{home.realm}}</code> realm. New identities need an invitation from the operator; once here, an
+            identity works like on any home, and can leave like from any home.<!--#endif--><!--#if closed-->For the
+            <code>{{home.realm}}</code> realm. This home takes no new identities; the ones it holds keep working, and can
+            leave like from any home.<!--#endif--> Usage is limited per network address and per identity<!--#if developers-->; the
+            limits are listed in <a href="/developers#api">this home's API</a><!--#endif-->.</li>
           <li>rootcard is pre-1.0 and has not had an external security review. The service is offered as is, with no
             guarantee of availability. Keep your recovery card and an account file so you can move if this home goes
             away.</li>

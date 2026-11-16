@@ -30,7 +30,8 @@
         it as a recovery card. Your id is the SHA-256 of a statement signed by that key, shown to people as
         <code>Astra#3F9C</code>.</p></div>
       <div class="step"><h3>Choose a home</h3><p>The recovery key signs an instance: a fresh account key and the server
-        that is your home. That can be {{home.name}}, another public home or your own server.</p></div>
+        that is your home. That can be {{home.name}}, another public home, a home by invitation (a company's, a
+        family's) or your own server.</p></div>
       <div class="step"><h3>Sign in</h3><p>Your device proves the password to fetch the vault, unlocks it locally and
         signs the home's one-time challenge. The password never leaves your device.</p></div>
       <div class="step"><h3>Prove</h3><p>Any service, on any server, can ask you to sign a challenge and check it against
@@ -92,14 +93,14 @@
           password and, once, a recovery card to save. Your server becomes the <em>host</em> with
           <code>rootcard-host</code> (Rust); your pages use the npm package. No redirect, no third party, no password
           database to leak.</p>
-        <a href="/developers">Integrate rootcard →</a>
+        <!--#if developers--><a href="/developers">Integrate rootcard →</a><!--#endif-->
       </div>
       <div class="panel">
         <h3>An ID card across websites</h3>
         <p class="muted">Choose a home: {{home.name}}, a host run by someone you trust, or your own. Any other service
           checks who you are by itself, from a fresh proof addressed to it. Your account there is keyed by your account
           id, which never changes, even when you move.</p>
-        <a href="/create">Create a card with {{home.name}} as home →</a>
+        <!--#if create--><a href="/create">Create a card with {{home.name}} as home →</a><!--#endif-->
       </div>
     </div>
   </div>
@@ -142,7 +143,7 @@
         test vectors. The JavaScript package has zero dependencies and runs on WebCrypto in browsers and Node 20+. A host
         never sees a password, never runs Argon2id and verifies logs incrementally.</p>
       <div class="btn-row">
-        <a class="btn" href="/developers">Developer guide</a>
+        <!--#if developers--><a class="btn" href="/developers">Developer guide</a><!--#endif-->
         <a class="btn btn-ghost" href="https://github.com/rootcard/rootcard/blob/main/spec/SPEC.md">Read the spec</a>
         <a class="btn btn-ghost" href="https://github.com/rootcard/rootcard">Source on GitHub</a>
       </div>

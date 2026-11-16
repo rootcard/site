@@ -6,7 +6,11 @@
 //! address they sign from `location.origin` (HOST_PROTOCOL.md §1).
 #![forbid(unsafe_code)]
 
+#[allow(dead_code)] // `flags` and `MODES` are for build.rs, which checks the markers
+mod cond;
 mod limits;
+mod pages;
+mod registration;
 mod store;
 
 mod assets {
@@ -17,20 +21,19 @@ mod assets {
         pub etag: &'static str,
     }
     include!(concat!(env!("OUT_DIR"), "/assets.rs"));
-
-    pub fn find(path: &str) -> Option<&'static Asset> {
-        ASSETS.iter().find(|a| a.path == path)
-    }
 }
 
 use axum::body::{Body, to_bytes};
 use axum::extract::{ConnectInfo, State};
 use axum::http::{HeaderMap, HeaderValue, Method, StatusCode, header};
 use axum::response::Response;
-use limits::{Limiter, classify};
+use limits::{INVITE, Limiter, classify};
+use pages::Site;
+use registration::{Mode, Registration};
 use rootcard::encoding::{hex_decode, hex_encode};
 use rootcard_host::http::{MAX_BODY, Request as HostRequest, Response as HostResponse, route, well_known};
 use rootcard_host::peer::PeerHeaders;
+use rootcard_host::store::IdentityStore;
 use rootcard_host::{Host, HostConfig, RealmConfig, UsernamePolicy};
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -61,6 +64,10 @@ struct App {
     cards: AtomicI64,
     /// The body of `/.well-known/rootcard-link`, if this home has one.
     link_tokens: Option<String>,
+    /// Who may get an identity here (`ROOTCARD_SITE_REGISTRATION`).
+    registration: Registration,
+    /// The pages served (`ROOTCARD_SITE_PAGES`), with their conditional parts applied.
+    site: Site,
 }
 
 /// The strict policy for every page the site serves: they handle passwords (rootcard THREAT_MODEL.md T19), so no inline
@@ -167,13 +174,18 @@ fn write_secret(path: &std::path::Path, text: &str) {
     std::fs::write(path, text).unwrap_or_else(|e| fail(format!("{}: {e}", path.display())));
 }
 
-fn config() -> HostConfig {
-    let urls: Vec<String> = env("ROOTCARD_SITE_URLS")
+/// The base URLs of `ROOTCARD_SITE_URLS`, the first preferred.
+fn base_urls() -> Vec<String> {
+    env("ROOTCARD_SITE_URLS")
         .unwrap_or_else(|| HOME_URL.into())
         .split(',')
         .map(|u| u.trim().trim_end_matches('/').to_string())
         .filter(|u| !u.is_empty())
-        .collect();
+        .collect()
+}
+
+fn config() -> HostConfig {
+    let urls = base_urls();
     for u in &urls {
         // The site is the host, so the base URL is an origin: its pages derive it from `location.origin`.
         if u.splitn(4, '/').nth(3).is_some() {
@@ -215,8 +227,54 @@ fn config() -> HostConfig {
     config
 }
 
+const USAGE: &str = "usage: rootcard-site            run the home (configured by ROOTCARD_SITE_* variables)
+       rootcard-site invite [NOTE] make an invite, add it to ROOTCARD_SITE_INVITES_FILE with NOTE as its comment,
+                                   and print the registration link that carries it";
+
+/// `rootcard-site invite [note]`: a new invite, added to the invites file, and its link on standard output.
+fn invite_command(note: &[String]) {
+    let token = registration::new_token(random);
+    let url = base_urls().into_iter().next().unwrap_or_else(|| HOME_URL.into());
+    match env("ROOTCARD_SITE_INVITES_FILE").map(PathBuf::from) {
+        Some(path) => {
+            registration::append(&path, &token, &note.join(" "))
+                .unwrap_or_else(|e| fail(format!("{}: {e}", path.display())));
+            eprintln!(
+                "Added the invite to {}. It works until you delete its line.",
+                path.display()
+            );
+        }
+        None => eprintln!(
+            "Not saved anywhere: set ROOTCARD_SITE_INVITES_FILE to have `rootcard-site invite` add it there, \
+             or add {token} to ROOTCARD_SITE_INVITES and restart."
+        ),
+    }
+    match Registration::from_env(env) {
+        Ok(r) if r.mode != Mode::Invite => eprintln!(
+            "Note: registration here is {}; invites count only with ROOTCARD_SITE_REGISTRATION=invite.",
+            r.mode.name()
+        ),
+        Err(e) => eprintln!("Note: the server would not start: {e}"),
+        Ok(_) => {}
+    }
+    if pages::select(env("ROOTCARD_SITE_PAGES").as_deref()).is_ok_and(|p| !p.iter().any(|p| p == "create")) {
+        eprintln!("Note: ROOTCARD_SITE_PAGES leaves out create, so the link leads to a page this home does not serve.");
+    }
+    println!("{url}/create#invite={token}");
+}
+
 #[tokio::main]
 async fn main() {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    match args.first().map(String::as_str) {
+        None => {}
+        Some("invite") => return invite_command(&args[1..]),
+        Some("-h" | "--help" | "help") => return println!("{USAGE}"),
+        Some(other) => fail(format!("unknown command {other:?}\n{USAGE}")),
+    }
+    let registration = Registration::from_env(env).unwrap_or_else(|e| fail(e));
+    let chosen = pages::select(env("ROOTCARD_SITE_PAGES").as_deref()).unwrap_or_else(|e| fail(e));
+    let site = Site::new(&chosen, registration.mode, HOME_URL).unwrap_or_else(|e| fail(e));
     let config = config();
     let link_tokens = link_token_file().unwrap_or_else(|e| fail(e));
     let https = config.urls.iter().all(|u| u.starts_with("https://"));
@@ -233,6 +291,8 @@ async fn main() {
         https,
         cards: AtomicI64::new(-1),
         link_tokens,
+        registration,
+        site,
     });
 
     let sweeper = app.clone();
@@ -256,12 +316,16 @@ async fn main() {
         }
     });
 
-    let router = axum::Router::new().fallback(handle).with_state(app);
+    let router = axum::Router::new().fallback(handle).with_state(app.clone());
     let bind = env("ROOTCARD_SITE_BIND").unwrap_or_else(|| "127.0.0.1:8080".into());
     let listener = tokio::net::TcpListener::bind(&bind)
         .await
         .unwrap_or_else(|e| fail(format!("{bind}: {e}")));
-    eprintln!("rootcard-site on {bind}, host key {key}, base URL {urls}");
+    eprintln!(
+        "rootcard-site on {bind}, host key {key}, base URL {urls}, registration {}, pages {}",
+        app.registration.mode.name(),
+        app.site.pages.join(", ")
+    );
     axum::serve(listener, router.into_make_service_with_connect_info::<SocketAddr>())
         .with_graceful_shutdown(shutdown())
         .await
@@ -354,6 +418,8 @@ async fn handle(
         host_pointer(&app, req.method(), req.headers())
     } else if path == LINK_TOKEN_PATH && app.link_tokens.is_some() {
         link_tokens(&app, req.method())
+    } else if path == INVITE_PATH {
+        invite_check(&app, peer, req.method(), req.headers())
     } else {
         site(&app, req.method(), &path, req.uri().query(), req.headers()).await
     };
@@ -412,14 +478,88 @@ async fn api(app: &Arc<App>, peer: SocketAddr, req: axum::extract::Request) -> R
         peer: peer_headers,
         body: body.to_vec(),
     };
+    let gate = registration_gate(&host_req.method, &relative);
+    let invite = header(registration::HEADER);
     let a = app.clone();
-    let Ok(out) = tokio::task::spawn_blocking(move || route(&a.host, &host_req, now(), &mut random)).await else {
+    let Ok(out) = tokio::task::spawn_blocking(move || {
+        if let Some(account) = gate {
+            // Only a new identity needs to be let in: an instance for one homed here already is its own business.
+            let new = account.is_none_or(|acc| !matches!(a.db.load(&acc), Ok(Some(_))));
+            if new {
+                a.registration.check(invite.as_deref())?;
+            }
+        }
+        Ok(route(&a.host, &host_req, now(), &mut random))
+    })
+    .await
+    else {
         return json_error(500, "internal");
+    };
+    let out = match out {
+        Ok(out) => out,
+        Err(code) => {
+            app.limiter.failed(&class, account, now());
+            return json_error(403, code);
+        }
     };
     if !(200..300).contains(&out.status) {
         app.limiter.failed(&class, account, now());
     }
-    host_response(out)
+    let mut r = host_response(out);
+    if app.registration.mode == Mode::Invite
+        && let Some(v) = r.headers().get(header::ACCESS_CONTROL_ALLOW_HEADERS)
+        && let Ok(v) = HeaderValue::from_str(&format!("{}, Rootcard-Invite", v.to_str().unwrap_or("")))
+    {
+        r.headers_mut().insert(header::ACCESS_CONTROL_ALLOW_HEADERS, v);
+    }
+    r
+}
+
+/// Whether a request may make an identity homed here, so the registration mode decides it: `Some(None)` for a
+/// registration, `Some(Some(account))` for an instance (an identity moving here, unless it is here already).
+fn registration_gate(method: &str, relative: &str) -> Option<Option<String>> {
+    if method != "POST" {
+        return None;
+    }
+    if relative == "/id/register" {
+        return Some(None);
+    }
+    let account = relative.strip_prefix("/id/")?.strip_suffix("/instance")?;
+    (!account.is_empty() && !account.contains('/')).then(|| Some(account.to_string()))
+}
+
+/// Where the registration page checks an invite before the user makes a recovery card for it.
+const INVITE_PATH: &str = "/invite";
+
+/// `POST /invite` with the invite in the `Rootcard-Invite` header: 204 if a registration with it would be let in,
+/// else 403 with the reason (`invite_required`, `invite_invalid`, `registration_closed`). Limited per address, so that
+/// invites cannot be guessed here faster than at the registration itself.
+fn invite_check(app: &App, peer: SocketAddr, method: &Method, headers: &HeaderMap) -> Response {
+    if method != Method::POST {
+        let mut r = Response::new(Body::empty());
+        *r.status_mut() = StatusCode::METHOD_NOT_ALLOWED;
+        r.headers_mut().insert(header::ALLOW, HeaderValue::from_static("POST"));
+        return r;
+    }
+    let address = client_address(app, peer, headers);
+    if let Err(retry) = app.limiter.check(&INVITE, &address, None, now()) {
+        let mut r = json_error(429, "rate_limited");
+        if let Ok(v) = HeaderValue::from_str(&retry.to_string()) {
+            r.headers_mut().insert(header::RETRY_AFTER, v);
+        }
+        return r;
+    }
+    let invite = headers.get(registration::HEADER).and_then(|v| v.to_str().ok());
+    match app.registration.check(invite) {
+        Ok(()) => {
+            let mut r = Response::new(Body::empty());
+            *r.status_mut() = StatusCode::NO_CONTENT;
+            r.headers_mut()
+                .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+            r
+        }
+        Err(code) => json_error(403, code),
+    }
 }
 
 /// An answer of `rootcard_host` as an axum response, with the API's own CSP.
@@ -502,30 +642,6 @@ fn link_tokens(app: &App, method: &Method) -> Response {
     r
 }
 
-/// The file behind a site path: `/` is `index.html`, `/create` is `create.html`.
-fn asset_for(path: &str) -> Option<&'static assets::Asset> {
-    if path.contains("/_") || path.contains("..") {
-        return None;
-    }
-    let p = path.trim_end_matches('/');
-    if p.is_empty() {
-        return assets::find("/index.html");
-    }
-    assets::find(p).or_else(|| assets::find(&format!("{p}.html")))
-}
-
-/// The one address of a page reached another way: `/create.html` and `/create/` are `/create`, `/index.html` and
-/// `/index` are `/`. `None` for a path that is already canonical or is not a page.
-fn canonical_path(path: &str) -> Option<String> {
-    let asset = asset_for(path)?;
-    if !asset.path.ends_with(".html") || asset.path.starts_with("/vendor/") || asset.path == "/404.html" {
-        return None;
-    }
-    let page = asset.path.trim_end_matches(".html");
-    let page = if page == "/index" { "/" } else { page };
-    (path != page).then(|| page.to_string())
-}
-
 async fn site(app: &Arc<App>, method: &Method, path: &str, query: Option<&str>, headers: &HeaderMap) -> Response {
     if method != Method::GET && method != Method::HEAD {
         let mut r = Response::new(Body::empty());
@@ -552,7 +668,7 @@ async fn site(app: &Arc<App>, method: &Method, path: &str, query: Option<&str>, 
     }
     // The key tool is meant to be opened from the user's own disk (rootcard SPEC [PWR-6]): it is only ever downloaded
     // from here, never rendered, so this site never runs a page that asks for a recovery key.
-    if let Some(page) = canonical_path(path) {
+    if let Some(page) = app.site.canonical_path(path) {
         let location = match query {
             Some(q) => format!("{page}?{q}"),
             None => page,
@@ -566,14 +682,14 @@ async fn site(app: &Arc<App>, method: &Method, path: &str, query: Option<&str>, 
     }
     let download = path == "/download/rootcard-keytool.html";
     let lookup = if download {
-        assets::find("/vendor/rootcard/keytool.html")
+        app.site.find("/vendor/rootcard/keytool.html")
     } else {
-        asset_for(path)
+        app.site.asset_for(path)
     };
     let (status, asset) = match lookup {
         // The not-found page is never found at an address of its own.
         Some(a) if a.path != "/404.html" => (StatusCode::OK, a),
-        _ => match assets::find("/404.html") {
+        _ => match app.site.find("/404.html") {
             Some(a) => (StatusCode::NOT_FOUND, a),
             None => {
                 let mut r = Response::new(Body::from("not found"));
@@ -621,6 +737,11 @@ async fn site(app: &Arc<App>, method: &Method, path: &str, query: Option<&str>, 
 mod tests {
     use super::*;
 
+    /// Every page, open registration: the site as this build serves it by default.
+    fn full() -> Site {
+        Site::new(&pages::select(None).expect("all"), Mode::Open, HOME_URL).expect("site")
+    }
+
     #[test]
     fn api_paths() {
         assert!(is_api("/v0/host"));
@@ -632,36 +753,36 @@ mod tests {
 
     #[test]
     fn asset_paths() {
-        assert_eq!(asset_for("/").map(|a| a.path), Some("/index.html"));
-        assert_eq!(asset_for("/create").map(|a| a.path), Some("/create.html"));
-        assert!(asset_for("/_partials/header").is_none());
-        assert!(asset_for("/../Cargo.toml").is_none());
+        assert_eq!(full().asset_for("/").map(|a| a.path), Some("/index.html"));
+        assert_eq!(full().asset_for("/create").map(|a| a.path), Some("/create.html"));
+        assert!(full().asset_for("/_partials/header").is_none());
+        assert!(full().asset_for("/../Cargo.toml").is_none());
     }
 
     #[test]
     fn canonical_paths() {
-        assert_eq!(canonical_path("/create.html").as_deref(), Some("/create"));
-        assert_eq!(canonical_path("/create/").as_deref(), Some("/create"));
-        assert_eq!(canonical_path("/index.html").as_deref(), Some("/"));
-        assert_eq!(canonical_path("/index").as_deref(), Some("/"));
-        assert_eq!(canonical_path("/"), None);
-        assert_eq!(canonical_path("/create"), None);
-        assert_eq!(canonical_path("/404"), None);
-        assert_eq!(canonical_path("/css/site.css"), None);
-        assert_eq!(canonical_path("/vendor/rootcard/keytool.html"), None);
-        assert_eq!(canonical_path("/nope.html"), None);
+        assert_eq!(full().canonical_path("/create.html").as_deref(), Some("/create"));
+        assert_eq!(full().canonical_path("/create/").as_deref(), Some("/create"));
+        assert_eq!(full().canonical_path("/index.html").as_deref(), Some("/"));
+        assert_eq!(full().canonical_path("/index").as_deref(), Some("/"));
+        assert_eq!(full().canonical_path("/"), None);
+        assert_eq!(full().canonical_path("/create"), None);
+        assert_eq!(full().canonical_path("/404"), None);
+        assert_eq!(full().canonical_path("/css/site.css"), None);
+        assert_eq!(full().canonical_path("/vendor/rootcard/keytool.html"), None);
+        assert_eq!(full().canonical_path("/nope.html"), None);
     }
 
     #[test]
     fn search_metadata() {
         // Every indexable page names its canonical URL and is in the sitemap; robots.txt points at the sitemap.
-        let sitemap = std::str::from_utf8(assets::find("/sitemap.xml").expect("sitemap").body).expect("utf-8");
-        let create = std::str::from_utf8(assets::find("/create.html").expect("create").body).expect("utf-8");
+        let sitemap = std::str::from_utf8(full().find("/sitemap.xml").expect("sitemap").body).expect("utf-8");
+        let create = std::str::from_utf8(full().find("/create.html").expect("create").body).expect("utf-8");
         assert!(create.contains(&format!("<link rel=\"canonical\" href=\"{HOME_URL}/create\">")));
         assert!(sitemap.contains(&format!("<loc>{HOME_URL}/</loc>")));
         assert!(sitemap.contains(&format!("<loc>{HOME_URL}/create</loc>")));
         assert!(!sitemap.contains("/404") && !sitemap.contains("/account") && !sitemap.contains("/vendor/"));
-        let robots = std::str::from_utf8(assets::find("/robots.txt").expect("robots").body).expect("utf-8");
+        let robots = std::str::from_utf8(full().find("/robots.txt").expect("robots").body).expect("utf-8");
         if robots.contains("Sitemap:") {
             assert!(robots.contains(&format!("Sitemap: {HOME_URL}/sitemap.xml")));
         }
@@ -677,12 +798,12 @@ mod tests {
             let text = std::str::from_utf8(a.body).expect("utf-8");
             assert!(!text.contains("{{"), "{} has a placeholder left", a.path);
         }
-        let index = std::str::from_utf8(assets::find("/index.html").expect("index").body).expect("utf-8");
+        let index = std::str::from_utf8(full().find("/index.html").expect("index").body).expect("utf-8");
         assert!(index.contains(env!("ROOTCARD_HOME_NAME")));
         let config =
-            std::str::from_utf8(assets::find("/js/home-config.js").expect("home-config.js").body).expect("utf-8");
+            std::str::from_utf8(full().find("/js/home-config.js").expect("home-config.js").body).expect("utf-8");
         assert!(config.contains(HOME_REALM) && config.contains(HOME_URL));
-        assert!(assets::find("/site.webmanifest").is_some());
+        assert!(full().find("/site.webmanifest").is_some());
     }
 
     #[test]
@@ -710,7 +831,7 @@ mod tests {
         let file = link_token_file().expect("operator_account");
         assert_eq!(file.is_some(), !OPERATOR_ACCOUNT.is_empty());
         for page in LINK_PAGES {
-            assert!(assets::find(page).is_some(), "{page}");
+            assert!(full().find(page).is_some(), "{page}");
         }
     }
 

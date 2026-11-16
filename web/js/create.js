@@ -2,7 +2,7 @@
 //   GET /host → build the inception, the pending instance (home = this host), the vault and an empty profile in the
 //   browser → the user saves the recovery card → POST /id/register → fetch the log back and verify it.
 
-import { BASE, HOME, REALM, busy, download, explain, fetchLog, http, instanceTime, now, rc, renderCard, status, tilt, work } from "/js/common.js";
+import { BASE, HOME, HttpError, REALM, busy, download, explain, fetchLog, http, instanceTime, now, rc, renderCard, status, tilt, work } from "/js/common.js";
 import { checkPassword } from "/vendor/rootcard/src/vault.js";
 
 const $ = (id) => document.getElementById(id);
@@ -19,6 +19,50 @@ function showPreview(extra = {}) {
 }
 showPreview();
 tilt(preview);
+
+// A home by invitation has an invite field (the server leaves it out otherwise). An invitation link,
+// /create#invite=<invite>, fills it in; the fragment never reaches a server, and is taken out of the address bar so that
+// it does not stay in the history or end up in a screenshot.
+const inviteField = $("invite");
+function inviteFromLink() {
+  const fromLink = new URLSearchParams(location.hash.slice(1)).get("invite") ?? new URLSearchParams(location.search).get("invite");
+  if (fromLink) {
+    inviteField.value = fromLink.trim();
+    inviteField.removeAttribute("aria-invalid");
+    history.replaceState(null, "", location.pathname);
+  }
+}
+if (inviteField) {
+  inviteFromLink();
+  // An invitation link opened in a tab that already shows this page changes only the fragment.
+  addEventListener("hashchange", inviteFromLink);
+}
+const invite = () => inviteField?.value.trim() ?? "";
+const inviteHeaders = () => (inviteField ? { "Rootcard-Invite": invite() } : {});
+
+/** Check the invite with this home before a recovery card is made for a registration it would refuse. */
+async function checkInvite() {
+  if (!inviteField) return;
+  inviteField.removeAttribute("aria-invalid");
+  try {
+    if (!invite()) throw new HttpError(403, { error: "invite_required" });
+    status($("status1"), "busy", "Checking your invite…");
+    const res = await fetch("/invite", { method: "POST", headers: inviteHeaders(), credentials: "omit", cache: "no-store" });
+    if (res.status === 204) return;
+    let body = null;
+    try {
+      body = await res.json();
+    } catch {
+      body = null;
+    }
+    if (body?.error === "rate_limited") throw new rc.RootcardError("rate_limited");
+    throw new HttpError(res.status, body);
+  } catch (e) {
+    if (e instanceof HttpError && e.status === 403) inviteField.setAttribute("aria-invalid", "true");
+    if (e instanceof TypeError) throw new Error(`Could not reach ${HOME.name}. Check your connection and try again.`);
+    throw e;
+  }
+}
 
 function step(n) {
   for (const li of $("wizard").children) {
@@ -84,6 +128,7 @@ $("step1").addEventListener("submit", (e) => {
   busy(form, async () => {
     try {
       const { username } = checkInputs();
+      await checkInvite();
       status($("status1"), "busy", "Generating your recovery key…");
       await rc.checkSupport();
       const p = await work("prepare", REALM, username);
@@ -161,7 +206,7 @@ $("activate").addEventListener("click", () => {
         }
         const r = built.r;
         status($("status2"), "busy", `Registering with ${HOME.name}…`);
-        await http("POST", "/id/register", { log: r.log, vault: r.vault, public: r.public });
+        await http("POST", "/id/register", { log: r.log, vault: r.vault, public: r.public }, undefined, inviteHeaders());
         // From here on the identity exists: the recovery key is erased and the card the user saved is the only copy.
         // Whatever fails next, this page must not offer to start over, which would make a second identity.
         registered = { account: r.account, public: r.public, vault: r.vault };
