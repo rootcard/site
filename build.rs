@@ -367,8 +367,11 @@ fn main() {
                     .replace("{{page.description}}", &description);
             }
             for flag in cond::flags(&text).unwrap_or_else(|e| panic!("web/{rel}: {e}")) {
-                if !page_names.contains(&flag) && !cond::MODES.contains(&flag.as_str()) {
-                    panic!("web/{rel}: <!--#if {flag}-->: not a page of this build or a registration mode");
+                if !page_names.contains(&flag)
+                    && !cond::MODES.contains(&flag.as_str())
+                    && !cond::FEATURES.contains(&flag.as_str())
+                {
+                    panic!("web/{rel}: <!--#if {flag}-->: not a page of this build, a registration mode or a feature");
                 }
             }
             if !text.contains("<meta name=\"robots\" content=\"noindex") {
@@ -381,7 +384,8 @@ fn main() {
                 .into_bytes();
         }
         if (rel.ends_with(".html") && !rel.starts_with("vendor/")) || rel == "robots.txt" {
-            let text = String::from_utf8_lossy(&bytes);
+            // `{{webpulse.id}}` is filled in when the server starts (`ROOTCARD_SITE_WEBPULSE_ID`, src/pages.rs).
+            let text = String::from_utf8_lossy(&bytes).replace("{{webpulse.id}}", "");
             if let Some(i) = text.find("{{") {
                 let token: String = text[i..].chars().take(40).collect();
                 panic!("web/{rel}: unknown placeholder {token}");

@@ -35,7 +35,8 @@ unchanged, integrity checked against the registry). The server never sees a pass
 | `/.well-known/rootcard-link` | With `operator_account` in `home.toml`: the operator's link token ([LNK-5]), with open CORS, so the operator's identity can list this home's domain as its website (service `web`) |
 | `/policy` | Operator (`Hexagon#DNTT`), the live host key from `/v0/host`, what is stored and for how long, how to leave |
 
-Every page is served with a strict CSP (`script-src 'self'`, no inline script or style, nothing third-party), `nosniff`,
+Every page is served with a strict CSP (`script-src 'self'`, no inline script or style, nothing third-party unless
+`ROOTCARD_SITE_WEBPULSE_ID` turns on the WebPulse tracker), `nosniff`,
 `no-referrer`, `frame-ancestors 'none'` and HSTS on https. `/card` and `/account` may also fetch (`connect-src`) from any
 https origin, which a linked-account check needs (GitHub's API, the linked website, the DNS-over-HTTPS resolver); they do
 so only when the user asks for a check, and read the answers as data only.
@@ -168,6 +169,7 @@ ROOTCARD_SITE_URLS=http://127.0.0.1:8080 cargo run
 | `ROOTCARD_SITE_INVITES` | – | Invites, comma separated (sets `invite`) |
 | `ROOTCARD_SITE_INVITES_FILE` | – | A file of invites, one per line, read at every check; `rootcard-site invite` adds to it (sets `invite`) |
 | `ROOTCARD_SITE_PAGES` | `all` | The pages served: `all`, `minimal`, names, `-name` ([fewer pages](#fewer-pages)) |
+| `ROOTCARD_SITE_WEBPULSE_ID` | off | WebPulse page view tracking: the client id (24 lowercase hex digits). Set, every page loads `https://track.webpulseanalytics.com/client/<id>` and the CSP allows that origin in `script-src` and `connect-src`; unset, neither is sent. A malformed id stops the server at start |
 | `ROOTCARD_SITE_TRUST_PROXY` | off (on in the `Dockerfile`) | Take the client address from the last `X-Forwarded-For` entry (for rate limits), when the connection comes from a loopback or private address (the reverse proxy) |
 
 Production: run behind a TLS-terminating reverse proxy (Caddy, nginx) on the home's URL with

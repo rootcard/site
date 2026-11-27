@@ -3,8 +3,8 @@
 //! The pages are embedded at build time, but which pages a home serves and whether it takes registrations are chosen
 //! when the server starts (`ROOTCARD_SITE_PAGES`, `ROOTCARD_SITE_REGISTRATION`). The server applies these markers once
 //! at start, so a link to a page that is not served, or a "Create a card" button on a closed home, is not in the page
-//! at all. A flag is the name of a page (`developers`: `/developers` is served) or a registration mode (`open`,
-//! `invite`, `closed`). Markers do not nest. build.rs checks every page with [`flags`], so a malformed marker or an
+//! at all. A flag is the name of a page (`developers`: `/developers` is served), a registration mode (`open`,
+//! `invite`, `closed`) or a feature ([`FEATURES`]). Markers do not nest. build.rs checks every page with [`flags`], so a malformed marker or an
 //! unknown flag fails the build, not the server.
 //!
 //! Shared by build.rs and the server (`#[path]`), so it uses nothing but the standard library.
@@ -16,6 +16,9 @@ const STRAY: &str = "<!--#else--> or <!--#endif--> without <!--#if";
 
 /// The registration modes, which are flags too.
 pub const MODES: [&str; 3] = ["open", "invite", "closed"];
+
+/// Flags set by an optional feature: `webpulse` when `ROOTCARD_SITE_WEBPULSE_ID` is set.
+pub const FEATURES: [&str; 1] = ["webpulse"];
 
 /// One conditional block of `text`: byte ranges of the whole block, the flag (with its `!`), the kept parts.
 struct Block<'a> {
@@ -59,7 +62,7 @@ fn next_block(text: &str, from: usize) -> Result<Option<Block<'_>>, String> {
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'_')
     {
         return Err(format!(
-            "<!--#if {flag}-->: a flag is a page name or a registration mode"
+            "<!--#if {flag}-->: a flag is a page name, a registration mode or a feature"
         ));
     }
     Ok(Some(Block {
