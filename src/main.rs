@@ -68,6 +68,9 @@ struct App {
     registration: Registration,
     /// The pages served (`ROOTCARD_SITE_PAGES`), with their conditional parts applied.
     site: Site,
+    /// The policies sent with the pages: [`CSP`] and [`CSP_LINKS`], with WebPulse allowed when it is on.
+    csp: &'static str,
+    csp_links: &'static str,
 }
 
 /// The strict policy for every page the site serves: they handle passwords (rootcard THREAT_MODEL.md T19), so no inline
@@ -81,6 +84,18 @@ const CSP: &str = "default-src 'none'; script-src 'self'; worker-src 'self'; sty
 /// pages fetch only when the user asks for a check.
 const CSP_LINKS: &str = "default-src 'none'; script-src 'self'; worker-src 'self'; style-src 'self'; img-src 'self' data: blob:; \
     connect-src 'self' https:; font-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+
+/// The origin of the WebPulse page view tracker: added to `script-src` and `connect-src` only when
+/// `ROOTCARD_SITE_WEBPULSE_ID` is set (`web/_partials/base.html` loads it then), and never for the pages of
+/// [`pages::UNTRACKED`].
+const WEBPULSE_ORIGIN: &str = "https://track.webpulseanalytics.com";
+
+/// `policy` with the WebPulse tracker allowed: its script, and its reports where `connect-src` is `'self'` alone.
+fn with_webpulse(policy: &str) -> String {
+    policy
+        .replace("script-src 'self'", &format!("script-src 'self' {WEBPULSE_ORIGIN}"))
+        .replace("connect-src 'self';", &format!("connect-src 'self' {WEBPULSE_ORIGIN};"))
+}
 
 /// The pages served with [`CSP_LINKS`].
 const LINK_PAGES: [&str; 2] = ["/card.html", "/account.html"];
@@ -274,7 +289,12 @@ async fn main() {
     }
     let registration = Registration::from_env(env).unwrap_or_else(|e| fail(e));
     let chosen = pages::select(env("ROOTCARD_SITE_PAGES").as_deref()).unwrap_or_else(|e| fail(e));
-    let site = Site::new(&chosen, registration.mode, HOME_URL).unwrap_or_else(|e| fail(e));
+    let webpulse = pages::webpulse_id(env("ROOTCARD_SITE_WEBPULSE_ID").as_deref()).unwrap_or_else(|e| fail(e));
+    let (csp, csp_links): (&'static str, &'static str) = match webpulse {
+        Some(_) => (String::leak(with_webpulse(CSP)), String::leak(with_webpulse(CSP_LINKS))),
+        None => (CSP, CSP_LINKS),
+    };
+    let site = Site::new(&chosen, registration.mode, HOME_URL, webpulse.as_deref()).unwrap_or_else(|e| fail(e));
     let config = config();
     let link_tokens = link_token_file().unwrap_or_else(|e| fail(e));
     let https = config.urls.iter().all(|u| u.starts_with("https://"));
@@ -293,6 +313,8 @@ async fn main() {
         link_tokens,
         registration,
         site,
+        csp,
+        csp_links,
     });
 
     let sweeper = app.clone();
@@ -714,10 +736,11 @@ async fn site(app: &Arc<App>, method: &Method, path: &str, query: Option<&str>, 
     h.insert(header::CONTENT_TYPE, HeaderValue::from_static(asset.mime));
     h.insert(header::ETAG, HeaderValue::from_static(asset.etag));
     h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
-    let csp = if LINK_PAGES.contains(&asset.path) {
-        CSP_LINKS
-    } else {
-        CSP
+    let csp = match (LINK_PAGES.contains(&asset.path), pages::UNTRACKED.contains(&asset.path)) {
+        (true, true) => CSP_LINKS,
+        (true, false) => app.csp_links,
+        (false, true) => CSP,
+        (false, false) => app.csp,
     };
     h.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static(csp));
     h.insert(
@@ -739,7 +762,7 @@ mod tests {
 
     /// Every page, open registration: the site as this build serves it by default.
     fn full() -> Site {
-        Site::new(&pages::select(None).expect("all"), Mode::Open, HOME_URL).expect("site")
+        Site::new(&pages::select(None).expect("all"), Mode::Open, HOME_URL, None).expect("site")
     }
 
     #[test]
@@ -790,12 +813,15 @@ mod tests {
 
     #[test]
     fn home_applied() {
-        // Every page is filled in for the home of this build: no placeholder is left, and the name appears.
+        // Every page is filled in for the home of this build: no placeholder is left but the one filled in at start
+        // (`{{webpulse.id}}`), and the name appears.
         for a in assets::ASSETS
             .iter()
             .filter(|a| a.path.ends_with(".html") && !a.path.starts_with("/vendor/"))
         {
-            let text = std::str::from_utf8(a.body).expect("utf-8");
+            let text = std::str::from_utf8(a.body)
+                .expect("utf-8")
+                .replace("{{webpulse.id}}", "");
             assert!(!text.contains("{{"), "{} has a placeholder left", a.path);
         }
         let index = std::str::from_utf8(full().find("/index.html").expect("index").body).expect("utf-8");
@@ -842,5 +868,16 @@ mod tests {
         assert_eq!(origin_for(&urls, "127.0.0.1:8080"), Some("http://127.0.0.1:8080"));
         assert_eq!(origin_for(&urls, "127.0.0.1"), None);
         assert_eq!(origin_for(&urls, "evil.example"), None);
+    }
+
+    #[test]
+    fn webpulse_policies() {
+        let csp = with_webpulse(CSP);
+        assert!(csp.contains("script-src 'self' https://track.webpulseanalytics.com;"));
+        assert!(csp.contains("connect-src 'self' https://track.webpulseanalytics.com;"));
+        let links = with_webpulse(CSP_LINKS);
+        assert!(links.contains("script-src 'self' https://track.webpulseanalytics.com;"));
+        assert!(links.contains("connect-src 'self' https:;"));
+        assert!(!CSP.contains("webpulse") && !CSP_LINKS.contains("webpulse"));
     }
 }
