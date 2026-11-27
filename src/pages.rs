@@ -12,6 +12,11 @@ use crate::registration::Mode;
 /// `ROOTCARD_SITE_PAGES=minimal`: what a home needs for the identities it holds, without the pages about rootcard.
 pub const MINIMAL: [&str; 5] = ["account", "card", "create", "keytool", "policy"];
 
+/// The pages that never load the WebPulse tracker, whatever `ROOTCARD_SITE_WEBPULSE_ID` says: a password is typed or a
+/// recovery key is made there (rootcard THREAT_MODEL.md T19), so no third-party script may run on them. The server sends
+/// them the CSP without the tracker's origin too.
+pub const UNTRACKED: [&str; 2] = ["/create.html", "/account.html"];
+
 /// The pages that are always served.
 const ALWAYS: [&str; 2] = ["index", "404"];
 
@@ -108,7 +113,7 @@ fn fnv(text: &str) -> u64 {
 impl Site {
     /// The site with `chosen` pages (from [`select`]) for a home in registration `mode`; `home_url` is the base of the
     /// sitemap's addresses. `webpulse` is the WebPulse tracker's client id (from [`webpulse_id`]): with one, the
-    /// `webpulse` flag is set and `{{webpulse.id}}` is that id.
+    /// `webpulse` flag is set and `{{webpulse.id}}` is that id, except on the [`UNTRACKED`] pages.
     pub fn new(chosen: &[String], mode: Mode, home_url: &str, webpulse: Option<&str>) -> Result<Site, String> {
         let mut pages: Vec<String> = ALWAYS.iter().map(|s| s.to_string()).collect();
         pages.extend(
@@ -117,9 +122,6 @@ impl Site {
                 .filter(|p| !(mode == Mode::Closed && *p == "create"))
                 .cloned(),
         );
-        let on = |flag: &str| {
-            flag == mode.name() || (flag == "webpulse" && webpulse.is_some()) || pages.iter().any(|p| p == flag)
-        };
         let mut fingerprint = format!("{}:{}:", mode.name(), webpulse.unwrap_or(""));
         let mut sorted = pages.clone();
         sorted.sort();
@@ -137,6 +139,10 @@ impl Site {
                 .flatten();
             let changed = match (a.path, text) {
                 (_, Some(t)) if t.contains("<!--#") => {
+                    let tracked = webpulse.is_some() && !UNTRACKED.contains(&a.path);
+                    let on = |flag: &str| {
+                        flag == mode.name() || (flag == "webpulse" && tracked) || pages.iter().any(|p| p == flag)
+                    };
                     let t = cond::apply(t, &on).map_err(|e| format!("{}: {e}", a.path))?;
                     Some(t.replace("{{webpulse.id}}", webpulse.unwrap_or("")))
                 }
@@ -301,7 +307,11 @@ mod tests {
         }
         let off = Site::new(&select(None).expect("all"), Mode::Open, crate::HOME_URL, None).expect("site");
         let on = Site::new(&select(None).expect("all"), Mode::Open, crate::HOME_URL, Some(id)).expect("site");
-        for path in ["/index.html", "/create.html", "/404.html"] {
+        for path in UNTRACKED {
+            assert!(!page(&on, path).contains("webpulse"), "{path}");
+            assert!(!page(&on, path).contains("{{"), "{path}");
+        }
+        for path in ["/index.html", "/card.html", "/policy.html", "/404.html"] {
             assert!(!page(&off, path).contains("webpulse"), "{path}");
             assert!(!page(&off, path).contains("{{"), "{path}");
             let script =

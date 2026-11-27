@@ -86,7 +86,8 @@ const CSP_LINKS: &str = "default-src 'none'; script-src 'self'; worker-src 'self
     connect-src 'self' https:; font-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 
 /// The origin of the WebPulse page view tracker: added to `script-src` and `connect-src` only when
-/// `ROOTCARD_SITE_WEBPULSE_ID` is set (`web/_partials/base.html` loads it then).
+/// `ROOTCARD_SITE_WEBPULSE_ID` is set (`web/_partials/base.html` loads it then), and never for the pages of
+/// [`pages::UNTRACKED`].
 const WEBPULSE_ORIGIN: &str = "https://track.webpulseanalytics.com";
 
 /// `policy` with the WebPulse tracker allowed: its script, and its reports where `connect-src` is `'self'` alone.
@@ -735,10 +736,11 @@ async fn site(app: &Arc<App>, method: &Method, path: &str, query: Option<&str>, 
     h.insert(header::CONTENT_TYPE, HeaderValue::from_static(asset.mime));
     h.insert(header::ETAG, HeaderValue::from_static(asset.etag));
     h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
-    let csp = if LINK_PAGES.contains(&asset.path) {
-        app.csp_links
-    } else {
-        app.csp
+    let csp = match (LINK_PAGES.contains(&asset.path), pages::UNTRACKED.contains(&asset.path)) {
+        (true, true) => CSP_LINKS,
+        (true, false) => app.csp_links,
+        (false, true) => CSP,
+        (false, false) => app.csp,
     };
     h.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static(csp));
     h.insert(
